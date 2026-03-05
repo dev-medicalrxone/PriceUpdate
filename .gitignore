@@ -32,3 +32,6 @@ Release/
 *.tmp
 *.orig
 *.~dsk
+# Archives
+*.zip
+*.rar
