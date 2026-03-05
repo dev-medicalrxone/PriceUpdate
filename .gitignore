@@ -1,0 +1,24 @@
+﻿# Delphi output
+*.dcu
+*.dcp
+*.exe
+*.dll
+*.bpl
+*.drc
+*.map
+*.stat
+
+# IDE
+*.dsk
+*.local
+*.identcache
+
+# Backup / history
+__history/
+__recovery/
+
+# Build folders
+Win32/
+Win64/
+Debug/
+Release/

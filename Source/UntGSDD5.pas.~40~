@@ -1,0 +1,1755 @@
+unit UntGSDD5;
+
+interface
+
+uses
+  System.Classes, Vcl.Imaging.jpeg, IdHTTP, System.SysUtils,
+  Vcl.Forms, Vcl.Dialogs, XSBuiltIns, DB,
+  Windows, Messages, Graphics, Controls;
+
+
+
+Type
+  TGDDS5Routines = class(TObject)
+    Function DetailPackageSTR(InsertProduct: Boolean): boolean;
+    Function ShowImage(Alchemy_ID: Integer): Boolean;
+    function PatientEducation(APID, NDC, LanguageStr, Option: String; CreateForm: Boolean): String;
+    function Generic(Alchemy_ProductID, ProductNo: Integer): String;
+    procedure Equivalentes(Alchemy_ProductID: Integer);
+    procedure ImportProduct(Token: String);
+    procedure ListPackage(ALCHEMY_PRODUCTID: Integer);
+    procedure ListPackagePrice;
+    Procedure DetailProductSTR;
+    function DrugInteractions(NoCliente: Integer; Forma: String):Boolean;
+    Procedure ListAllergy(Token: String);
+    procedure ListOrderableNamesRequestSTR(Token: String);
+    function ListMarketedProductsRequestSTR(Token: String): Integer;
+  end;
+
+Var
+  GDDS5Routines: TGDDS5Routines;
+
+
+Implementation
+
+uses UntMain, GSDD5Server, UntDM;
+
+
+function ValidateText(Token: String): String;
+Var
+  Counter: Integer;
+  Str: String;
+begin
+  Result := '';
+  Counter :=1;
+  while Counter <= Length(Token) do
+  begin
+     Str := UpperCase(Copy(Token, Counter, 1));
+     if Copy(Token, Counter, 1) = 'Ñ' then Str := 'N';
+     if Copy(Token, Counter, 1) = 'ñ' then Str := 'n';
+     if Copy(Token, Counter, 1) = 'Á' then Str := 'A';
+     if Copy(Token, Counter, 1) = 'á' then Str := 'a';
+     if Copy(Token, Counter, 1) = 'É' then Str := 'E';
+     if Copy(Token, Counter, 1) = 'é' then Str := 'e';
+     if Copy(Token, Counter, 1) = 'Í' then Str := 'I';
+     if Copy(Token, Counter, 1) = 'í' then Str := 'i';
+     if Copy(Token, Counter, 1) = 'Ó' then Str := 'O';
+     if Copy(Token, Counter, 1) = 'ó' then Str := 'o';
+     if Copy(Token, Counter, 1) = 'Ú' then Str := 'U';
+     if Copy(Token, Counter, 1) = 'ú' then Str := 'u';
+     if Copy(Token, Counter, 1) = '.' then Str := '';
+     if Copy(Token, Counter, 1) = '"' then Str := '';
+     if Copy(Token, Counter, 1) = '>' then Str := '';
+     if Copy(Token, Counter, 1) = '<' then Str := '';
+     if Copy(Token, Counter, 1) = '&' then Str := '';
+     if Copy(Token, Counter, 1) = '`' then Str := '';
+     if Copy(Token, Counter, 1) = '}' then Str := '';
+     if Copy(Token, Counter, 1) = '{' then Str := '';
+     if Copy(Token, Counter, 1) = '~' then Str := '';
+     if Copy(Token, Counter, 1) = ')' then Str := '';
+     if Copy(Token, Counter, 1) = '(' then Str := '';
+     if Copy(Token, Counter, 1) = chr(39) then Str := '';
+     if Copy(Token, Counter, 1) = chr(28) then Str := '';
+     if Copy(Token, Counter, 1) = '' then Str := ' ';
+     Result := Result + Str;
+     Str := '';
+     Counter := Counter + 1;
+  end;
+end;
+
+function IsNumber(Token: String):boolean;
+var
+  i: extended;
+begin
+  Result := TryStrToFloat(Token,i);
+end;
+
+function TGDDS5Routines.ListMarketedProductsRequestSTR(Token: String): Integer;
+Var
+  request: ListMarketedProductsRequest;
+  response: ListMarketedProducts;
+  Serv: GSDDServiceSoap;
+  I, J, NoResp, NoProducts: Integer;
+begin
+   request := ListMarketedProductsRequest.Create;
+   request.NameFilter := Trim(Token)+'%';
+   request.MaxResultsReturned := 1;
+   request.IncludeOffMarket := True;
+   Serv := GetGSDDServiceSoap(False,'', FrmMain.HTTPRIO2);
+   Response := Serv.ListMarketedProducts(request);
+   NoResp := Length(Response.MarketedProduct);
+   for I := 0 to NoResp-1 do
+   begin
+      Try
+        Result := response.MarketedProduct[I].Identifier;
+      Except
+        Result := 0;
+      End;
+   end;
+end;
+
+
+Procedure TGDDS5Routines.ListOrderableNamesRequestSTR(Token: String);
+Var
+  request: ListOrderableNamesRequest;
+  response: ListOrderableNames;
+  Serv: GSDDServiceSoap;
+  I, J, NoResp, NoProducts: Integer;
+begin
+   request := ListOrderableNamesRequest.Create;
+   request.SearchString := Trim(Token);
+   request.BrandOrGeneric := BrandGenericEnum.Both;
+   request.BaseIngredientsOnly := True;
+   request.ReturnMarketedProductIDs := True;
+
+   Serv := GetGSDDServiceSoap(False,'', FrmMain.HTTPRIO2);
+   Response := Serv.ListOrderableNames(ListOrderableNamesRequest(request));
+   NoResp := Length(Response.OrderableName);
+   for I := 0 to NoResp-1 do
+   begin
+      NoProducts := Length(response.OrderableName[i].MarketedProductID);
+      for J := 0 to NoProducts-1 do
+      begin
+        FrmMain.ListProductRequest2(Response.OrderableName[i].MarketedProductID[j]);
+      end;
+
+     //ShowMessage(response.OrderableName[i].MarketedProductID[0].ToString)
+   end;
+end;
+
+
+Function TGDDS5Routines.DetailPackageSTR(InsertProduct: Boolean): boolean;
+Var
+  request: DetailPackageRequest;
+  response: DetailPackage;
+  alc: PackageIdentifierType; //AlchemyIdentifierType; //ProductIdentifierType; //FilterType;// ProductIdentifierTypeEnum;// FilterType;// IdentifierChoiceType; //IdentifierChoiceType; //ProductIdentifierType; //FilterIdType;// AlchemyIdentifierType;
+  Serv: GSDDServiceSoap;
+  NDC, ProdDesc, Resp, Casa_Farmaceutica, BRAND, Product, Strength, Token1, Token2, Token3: String;
+  NDClenght, PackageID, I: Integer;
+
+begin
+  With DM do
+  begin
+    alc := PackageIdentifierType.Create;
+    alc.IdentifierType := PackageIdentifierEnum.PackageID;
+    alc.Identifier := IntToStr(DM.CDSLIST_PACKAGESPACKAGE_ID.Value);
+    request := DetailPackageRequest.Create;
+    request.PackageIdentifier := alc;// IdentifierType.PackageID;
+    begin
+      Token1 := '';
+      Token2 := '';
+      Token3 := '';
+      NDC := '';
+      NDClenght := 0;
+      PackageID := CDSLIST_PACKAGESPACKAGE_ID.Value;
+      if PackageID > 0 then
+      begin
+        Try
+          alc.Identifier := IntToStr(PackageID);
+          request.PackageIdentifier := alc;
+          With DetailPackageRequest do
+          begin
+            Serv  :=  GetGSDDServiceSoap(False,'', FrmMain.HTTPRIO2);
+            Response := Serv.DetailPackage(DetailPackageRequest(request));
+          end;
+          NDClenght := Length(Response.Detail.PackageIdentifier);
+          for I := 0 to NDCLenght - 1 do
+          begin
+           // if Response.PackageIdentifiers[I].IdentifierType.NDC11 Then
+            //if Response.Detail.PackageIdentifier[I].IdentifierType.NDC11 = True Then
+            begin
+              Try
+                if (Copy(Response.Detail.PackageIdentifier[I].Identifier, 6, 1) = '-') and (Copy(Response.Detail.PackageIdentifier[I].Identifier, 11, 1) = '-') then
+                begin
+                  //if Copy(Response.PackageIdentifiers[I].Identifier, I+1, 1) <> '-' then
+                  //NDC := NDC + Copy(Response.PackageIdentifiers[I].Identifier, I+1, 1);
+                  NDC := Copy(Response.Detail.PackageIdentifier[I].Identifier, 1, 5) + Copy(Response.Detail.PackageIdentifier[I].Identifier, 7, 4) + Copy(Response.Detail.PackageIdentifier[I].Identifier, 12, 2);
+                  //FrmImportProducts.LabelNDC.Caption := 'NDC: ' + NDC; //+ Response.PackageIdentifiers[2].Identifier;
+                end;
+              Except
+                //
+              End;
+            end;
+          end;
+        Except
+          //
+        End;
+         // FrmPackageSizePrice.LabelNDC.Caption := 'NDC: ' + NDC; //+ Response.PackageIdentifiers[2].Identifier;
+          //if (DSInventario.State = dsEdit) or (DSInventario.State = dsInsert) then
+          //begin
+            {if InsertProduct = True then
+            begin
+              Queries.OpenInventory(NDC, '', 'AI');
+              if Trim(CDSInventarioNDC.Value) = '' then
+                CDSInventario.Append
+              else
+                CDSInventario.Edit;
+              begin
+
+                Result := True;
+                //CDSInventario.Append;
+                CDSInventarioNDC.Value := NDC;
+                CDSInventarioCODIGOBARRA.Value := NDC;
+                CDSInventarioOUTERPACKAGEUNIT.Value  := Copy(response.Detail.OuterPackageUnit,1,10);
+                try
+                CDSInventarioVERSION_DESCRIPTION.Value := UpperCase(Copy(response.Detail.PackageVersion[0].PackageVersionItems.DrugItem[0].VersionDescription, 1, 100));
+                Except
+                  CDSInventarioVERSION_DESCRIPTION.Value := '';
+                end;
+                CDSInventarioMETRICSIZE.asString := response.Detail.PackageSize.NativeToXS; // Versions[0].PackageVersionItems.DrugItems[0].Quantity.NativeToXS;
+                DetailProductSTR;
+              end
+              //else
+              //  Result := False;
+            end;
+          //end;}
+
+
+      end;
+      //CDSInventario.Next;
+    end;
+  end;
+  alc.Free;
+  //request.Free;
+end;
+
+
+Function TGDDS5Routines.ShowImage(Alchemy_ID: Integer): Boolean;
+Var
+  request: ListProductImagesRequest;
+  response: ListProductImages;
+  alc: ProductIdentifierType;
+  Serv: GSDDServiceSoap;
+  Resp: String;
+  Counter, I: Integer;
+  F:string;
+  //Fs:TFileStream;
+  FS2: TMemoryStream;
+  J : TJPEGImage;
+  IPOS: Integer;
+begin
+  if DM.CDSSetupGoldStandardActive.Value = True then
+  begin
+    Try
+      FrmMain.idHTTP1 := TIdHTTP.Create();
+      if Alchemy_ID > 0 then
+      begin
+        alc := ProductIdentifierType.Create;
+        alc.IdentifierType := ProductIdentifierEnum.ProductID;// alc.IdentifierType.ProductID;
+        alc.Identifier := IntToStr(Alchemy_ID);//DM.CDSInventarioALCHEMY_PRODUCTID.Value;
+        request := ListProductImagesRequest.Create;
+        request.ProductIdentifier := alc;
+        With ListProductImagesRequest do
+        begin
+          Serv  :=  GetGSDDServiceSoap(False,'', FrmMain.HTTPRIO2);
+          Response := Serv.ListProductImages(ListProductImagesRequest(request));
+        end;
+
+        Try
+          IPOS := Pos('3434', DM.GoldStandardDB);
+          if response.ProductImage[0].ImageId > 0 then
+          begin
+            F := Copy(DM.GoldStandardDB, 1, IPOS + 4) + 'getimage?imageid=' + IntToStr(response.ProductImage[0].ImageId) + '&imagetype=drug_item';
+            //ShowMessage(F);
+          end
+          else
+            F := Copy(DM.GoldStandardDB, 1, IPOS + 4) + 'getimage?imageid=' + IntToStr(response.ProductImage[0].ImageId) + '&imagetype=package';
+        Except
+           F := ''; //Copy(DM.GSDB, 1, 26) + 'getimage?alchemyid=' + IntToStr(1000000) + '&imagetype=package';
+        End;
+        end;
+       if F > '' then
+       begin
+         Result := True;
+         Try
+           J := TJPEGImage.Create;
+           FS2 := TMemoryStream.Create;
+           try
+             FrmMain.idHTTP1.Get(F,Fs2);
+           Except
+             Result := False;
+           end;
+           FS2.Position := 0;
+           j.LoadFromStream(FS2);
+          // if Assigned(FrmSearchMed) then FrmSearchMed.Image1.Picture.Assign(J);
+          // if Assigned(FAnadirRecetas) then FAnadirRecetas.ProductImage.Picture.Assign(J);
+          // if Assigned(FrmWorkflow) then FrmWorkflow.Image1.Picture.Assign(J);
+           FrmMain.idHTTP1.Free;
+           FS2.Free;
+           J.Free;
+         except
+           Result := False;
+         End;
+       end
+       else
+        Result := False;
+
+       request.Free;
+       //alc.Free;
+    Except
+      Result := False;
+    End;
+  end
+  else
+    Result := False;
+end;
+
+
+
+function TGDDS5Routines.Generic(Alchemy_ProductID, ProductNo: Integer): String;
+Var
+  request: ListPharmEquivalentProductsRequest;
+  response: ListPharmEquivalentProducts;
+  alc: ProductIdentifierType;
+  Serv: GSDDServiceSoap;
+  Counter, I: Integer;
+  ProductID: Array_Of_int;
+  sqlTxt: String;
+begin
+      alc := ProductIdentifierType.Create;
+      alc.IdentifierType := ProductIdentifierEnum.ProductID;
+      alc.Identifier := IntToStr(Alchemy_ProductID);
+      request := ListPharmEquivalentProductsRequest.Create;
+      request.ProductIdentifier := alc;
+        With ListPharmEquivalentProductsRequest do
+        begin
+          Serv  :=  GetGSDDServiceSoap(False,'', FrmMain.HTTPRIO2);
+          Response := Serv.ListPharmEquivalentProducts(ListPharmEquivalentProductsRequest(request));
+          Counter := Length(response.Product);
+          SetLength(ProductID, Counter) ;
+          sqlTxt := '' ;//sqlTxt + ' OR  (PRODUCTNO = ' +  IntToStr(DM.CDSMedOriginalPRODUCTNO.Value)+ ')';
+          for I := 0 to Counter - 1 do
+          begin
+            if response.Product[I].BrandGenericStatus = 'Brand' then
+               sqlTxt := sqlTxt + ' OR (ALCHEMY_PRODUCTID = ' + IntToStr(response.Product[I].ProductID) + ')';
+          end;
+          With DM do
+          begin
+            sqlTxt := Trim(copy(sqlTxt, 5, 1000));
+            if Trim(sqlTxt) > '' then
+            begin
+              CDSMedOriginal.Close;
+              CDSMedOriginal.CommandText := 'Select * from InventarioPiso where ' + sqlTxt + ' order by BRAND, DESCRIPCION';
+              CDSMedOriginal.Open;
+              //ShowMessage(CDSMedOriginal.CommandText);
+              if Trim(CDSMedOriginalMedicamentoStr.Value) > '' then
+                Result := Trim(CDSMedOriginalMedicamentoStr.Value)
+              else
+                Result := '';
+            end
+            else
+              Result := '';
+          end;
+         // FrmMain.idHTTP1.Free;
+  end;
+end;
+
+procedure TGDDS5Routines.Equivalentes(Alchemy_ProductID: Integer);
+Var
+  request: ListPharmEquivalentProductsRequest;
+  response: ListPharmEquivalentProducts;
+  alc: ProductIdentifierType;
+  Serv: GSDDServiceSoap;
+  Counter, I: Integer;
+  ProductID: Array_Of_int;
+  sqlTxt: String;
+begin
+    alc := ProductIdentifierType.Create;
+    alc.IdentifierType := ProductIdentifierEnum.ProductID;
+    alc.Identifier := IntToStr(Alchemy_ProductID);
+    request := ListPharmEquivalentProductsRequest.Create;
+    request.ProductIdentifier := alc;
+    With ListPharmEquivalentProductsRequest do
+    begin
+      Serv  :=  GetGSDDServiceSoap(False,'', FrmMain.HTTPRIO2);
+      Response := Serv.ListPharmEquivalentProducts(ListPharmEquivalentProductsRequest(request));
+      Counter := Length(response.Product);
+      SetLength(ProductID, Counter) ;
+      sqlTxt := sqlTxt + ' OR  (PRODUCTNO = ' +  IntToStr(DM.CDSInventarioPRODUCTNO.Value)+ ')';
+      for I := 0 to Counter - 1 do
+      begin
+         with DM do
+         begin
+           CDSInventario.Close;
+           CDSInventario.CommandText := 'Select * from InventarioPiso where ALCHEMY_PRODUCTID = ' + IntToStr(response.Product[I].ProductID) + ' and STATUS = ' + chr(39) + 'A' + chr(39);
+           CDSInventario.Open;
+           if CDSInventario.RecordCount > 0 then
+           begin
+             ProductID[I] := CDSInventarioPRODUCTNO.VAlue;
+             sqlTxt := sqlTxt + ' OR  (PRODUCTNO = ' +  IntToStr(CDSInventarioPRODUCTNO.Value)+ ')';
+           end;
+         end;
+      end;
+      With DM do
+      begin
+        sqlTxt := Trim(copy(sqlTxt, 5, 500));
+        CDSInventario.Close;
+        CDSInventario.CommandText := 'Select * from InventarioPiso where ' + sqlTxt + ' and STATUS = ' + chr(39) + 'A' + chr(39) + ' order by BRAND, DESCRIPCION';
+        CDSInventario.Open;
+      end;
+    end;
+
+end;
+
+procedure TGDDS5Routines.ImportProduct(Token: String);
+Var
+  request: ListProductsRequest;
+  response: ListProducts;
+  alc: ProductFilterType; //FilterType;// ProductIdentifierTypeEnum;// FilterType;// IdentifierChoiceType; //IdentifierChoiceType; //ProductIdentifierType; //FilterIdType;// AlchemyIdentifierType;
+  Serv: GSDDServiceSoap;
+  Resp: String;
+  Counter, I: Integer;
+begin
+  With DM do
+  begin
+    SQLQuery1.SQL.Text := 'Delete from List_Products where Instancia = ' + IntToStr(1);
+    SQLQuery1.ExecSQL();
+    if CDSListProducts.Active  then CDSListProducts.Refresh
+  end;
+  if Trim(Token) > '' then
+  begin
+    if IsNumber(copy(Token, 1, 1)) then
+    begin
+      alc := ProductFilterType.Create;
+      alc.ProductIdentifierFilter := ProductIdentifierType.Create;
+      alc.ProductIdentifierFilter.IdentifierType := ProductIdentifierEnum.NDC9;
+      alc.ProductIdentifierFilter.Identifier := Copy(Trim(Token), 1, 9);
+      request := ListProductsRequest.Create;
+      request.Filter := alc;
+    end
+    else
+    begin
+      alc := ProductFilterType.Create;
+      alc.ProductNameFilter := Trim(Token)+'%';
+      request := ListProductsRequest.Create;
+      request.Filter := alc;
+    end;
+      try
+        DM.CDSListProducts.Active := False;
+        DM.CDSListProducts.Active := True;
+        With ListProductsRequest do
+        begin
+          Serv  :=  GetGSDDServiceSoap(False,'', FrmMain.HTTPRIO2);
+          Response := Serv.ListProducts(ListProductsRequest(request));
+          Counter := Length(response.Product);
+              for I := 0 to Counter - 1 do
+          begin
+            With DM do
+            begin
+                SQLQuery1.SQL.Text := 'INSERT INTO [dbo].[LIST_PRODUCTS] ' +
+                '([PRODUCT_ID] ' +
+                ',[DESCRIPTION] ' +
+                ',[CASA_FARMACEUTICA] ' +
+               ',[NAME_TYPE]  ' +
+                ',[BRAND_GENERIC] ' +
+                ',[LEGEND_STATUS] ' +
+                ',[FederalDEAClass] ' +
+                ',[INSTANCIA]) ' +
+                'VALUES  (' +
+                IntToStr(response.Product[I].ProductID)  +
+                ', ' + chr(39) + Copy(response.Product[I].ProductNameShort,1,60) + chr(39) + //Short Product Name
+                ','+ chr(39) + Copy(ValidateText(response.Product[I].Marketer),1, 60) + chr(39)+
+                ',' + chr(39)+  Copy(response.Product[I].ProductNameType, 1, 30)+ chr(39) +
+                ',' + chr(39)+ Copy(ValidateText(response.Product[I].BrandGenericStatus), 1, 10)+ chr(39) +
+                ','+ chr(39) + Copy(response.Product[I].LegendStatus, 1, 2)+ chr(39) +
+                ','+ chr(39) + Copy(response.Product[I].FederalDEAClass, 1, 12)+ chr(39) +
+                ','+  IntToStr(1) + ')' ;
+                SQLQuery1.ExecSQL();
+
+                CDSListProducts.Close;
+                CDSListProducts.CommandText := 'Select * from List_Products where Instancia = ' + IntToStr(1);
+                CDSListProducts.Open;
+            end;
+          end;
+        end;
+      except
+       //
+      end;
+     if DM.CDSListProducts.RecordCount = 0 then
+     begin
+       ShowMessage('Product not found');
+       //Button3.Enabled := True;
+     end;
+  end;
+end;
+
+
+procedure TGDDS5Routines.ListPackage(ALCHEMY_PRODUCTID: Integer);
+Var
+  request: ListPackagesRequest;
+  response1: ListPackages;
+  alc: PackageFilterType; // ProductFilterType;
+  Serv: GSDDServiceSoap;
+  Resp: String;
+  Counter, I, I_PS: Integer;
+  MetricSize, Market_Status: String;
+  loop: Boolean;
+  I_Allergy, AllergyCount: Integer;
+begin
+  With DM do
+  begin
+    SQLQuery1.Close;
+    SQLQuery1.SQL.Text := 'Delete from LIST_PACKAGES where Instancia = ' + IntToStr(1);
+    SQLQuery1.ExecSQL();
+    CDSLIST_PACKAGES.Active := True;
+  end;
+      //alc := PackageFilterType.Create;
+      //alc.ProductNameFilter := Trim(DM.CDSListProductsDESCRIPTION.Value)+'%';
+      request := ListPackagesRequest.Create;
+      //request.Filter := alc;
+      request.Filter.ProductIdentifierFilter.IdentifierType := ProductIdentifierEnum.NDC9;
+      request.Filter.ProductIdentifierFilter.Identifier := Copy(DM.CDSInventarioNDC.Value, 1, 9);
+
+      //request.Product
+
+      try
+
+        With ListPackagesRequest do
+        begin
+          Serv  :=  GetGSDDServiceSoap(False,'', FrmMain.HTTPRIO2);
+          Response1 := Serv.ListPackages(ListPackagesRequest(request));
+          Counter := Length(Response1.Package_);
+          for I := 0 to Counter - 1 do
+          begin
+            With DM do
+            begin
+              Try
+               if response1.Package_[I].MarketStatus = MarketStatusEnum.OnMarket then
+                  MARKET_STATUS := 'OnMarket'
+                else
+                  MARKET_STATUS := 'OffMarket';
+               if CDSListProductsPRODUCT_ID.Value = Response1.Package_[I].ProductID then
+               begin
+                 SQLQuery1.SQL.Text := 'INSERT INTO [dbo].[LIST_PACKAGES] ' +
+                 '([ALCHEMY_PRODUCTID]  ' +
+                      ' ,[PACKAGE_ID] ' +
+                      ' ,[PRODUCT_NAME_TYPE] ' +
+                      ' ,[BILLING_UNIT] ' +
+                      ' ,[NCPDP_SCRIPT_FORM] ' +
+                      ' ,[OUTER_PACKAGE_UNIT] ' +
+                      ' ,[INSTANCIA] ' +
+                      ' ,[MARKET_STATUS]) '+
+                 ' VALUES ' +
+                       '(' + IntToStr(Response1.Package_[I].ProductID) +
+                       ',' + IntToStr(Response1.Package_[I].PackageID) +
+                       ',' + chr(39) + Copy(Response1.Package_[I].PackageDescription, 1, 80) + chr(39) +
+                       ',' + chr(39) + Copy(Response1.Package_[I].NCPDPBillingUnit,1, 10) + chr(39) +
+                       ',' + chr(39) + Copy(Response1.Package_[I].NCPDPScriptForm,1,20) + chr(39) +
+                       ',' + chr(39) + Copy(Response1.Package_[I].OuterPackageUnit,1,20) + chr(39) +
+                       ',' + IntToStr(1) +
+                       ',' + chr(39) + Market_Status + chr(39) + ')';
+                SQLQuery1.ExecSQL();
+               end;
+
+              Except
+                //
+              End;
+            end;
+          end;
+        end;
+      except
+       //
+      end;
+    //end;
+    With DM do
+    begin
+      CDSLIST_PACKAGES.Close;
+      CDSLIST_PACKAGES.CommandText := 'Select * from List_Packages where Instancia = '  + IntToStr(1);
+      CDSLIST_PACKAGES.Open;
+    end;
+end;
+
+procedure TGDDS5Routines.ListPackagePrice;
+Var
+  request: ListPackagePricesCurrentRequest;
+  response: ListPackagePricesCurrent;
+  alc: PackageIdentifierType;
+  Serv: GSDDServiceSoap;
+  Resp: String;
+  Counter, I: Integer;
+  SubTotalV: TXSDecimal;
+  PackagePrice, UnitPrice: String;
+
+begin
+  With DM do
+  begin
+    SQLQuery1.Close;
+    SQLQuery1.SQL.Text := 'Delete from PACKAGE_PRICES_LIST  where Instancia = ' + IntToStr(1);
+    SQLQuery1.ExecSQL();
+    CDSPACKAGE_PRICES_LIST.Active := True;
+  end;
+  if DM.CDSLIST_PACKAGESPACKAGE_ID.Value > 0 then
+  begin
+      alc := PackageIdentifierType.Create;
+      alc.IdentifierType := PackageIdentifierEnum.PackageID;
+      alc.Identifier := IntToStr(DM.CDSLIST_PACKAGESPACKAGE_ID.Value);
+      request := ListPackagePricesCurrentRequest.Create;
+      request.PackageIdentifier := alc;// IdentifierType.PackageID;
+      //
+
+      try
+        With ListPackagePricesRequest do
+        begin
+          Serv  :=  GetGSDDServiceSoap(False,'', FrmMain.HTTPRIO2);
+          Response := Serv.ListPackagePricesCurrent(ListPackagePricesCurrentRequest(request));
+          Counter := Length(response.PriceData);
+          for I := 0 to Counter - 1 do
+          begin
+            Try
+              Try
+                UnitPrice := response.PriceData[I].UnitPrice.NativeToXS
+              except
+                UnitPrice := '0';
+              End;
+              PackagePrice := FloatToStr((StrToFloat(UnitPrice) * StrToFloat(response.PriceData[I].PackageSize.NativeToXS)));
+              With DM do
+              begin
+                Try
+                  //if (response[I].PriceTypeID = 1) or (response[I].PriceTypeID = 16) then
+                  begin
+                    //if (Trim(PackagePrice) > '') and (Trim(UnitPrice) > '') then
+                    begin
+
+                      SQLQuery1.Close;
+                      SQLQuery1.SQL.Text := 'INSERT INTO [dbo].[PACKAGE_PRICES_LIST] ' +
+                           '([PRICE_ID] ' +
+                           ',[PACKAGEPRICE] ' +
+                           ',[UNITPRICE] ' +
+                           ',[PACKAGESIZE] ' +
+                           ',[NCPDPBILLINGUNIT] ' +
+                           ',[BEGINDATE] ' +
+                           ',[ALCHEMY_PRODUCTID] ' +
+                           ',[INSTANCIA]) ' +
+                     'VALUES ' +
+                           '(' + IntToStr(response.PriceData[I].PriceTypeID) +
+                           ',' + PackagePrice +
+                           ',' + UnitPrice +
+                           ',' + response.PriceData[I].PackageSize.NativeToXS +
+                           ',' + chr(39) + response.PriceData[I].NCPDPBillingUnit + chr(39) +
+                           ',' + chr(39) + Copy(response.PriceData[I].BeginDate.NativeToXS, 6, 2) + '/' +  Copy(response.PriceData[I].BeginDate.NativeToXS, 9, 2) + '/' +  Copy(response.PriceData[I].BeginDate.NativeToXS, 1, 4) +  chr(39) +
+                           ',' +  DM.CDSLIST_PACKAGESALCHEMY_PRODUCTID.asString +  //response[I]. <ALCHEMY_PRODUCTID, int,>
+                           ',' + IntToStr(1) + ')';
+                       SQLQuery1.ExecSQL();
+
+                    end;
+                  end;
+                Except
+                  //
+                End;
+              end;
+            Except
+              //
+            End;
+            // + ' Market Status: ' + response[I].MarketStatus);
+          end;
+        end;
+      except
+       //
+      end;
+    //end;
+    With DM do
+    begin
+      CDSPACKAGE_PRICES_LIST.Active := False;
+      CDSPACKAGE_PRICES_LIST.CommandText := 'Select * from PACKAGE_PRICES_LIST where Instancia = '   + IntToStr(1) + ' order by PACKAGEPRICE desc';
+      CDSPACKAGE_PRICES_LIST.Open;
+    end;
+
+  end;
+
+end;
+
+Procedure TGDDS5Routines.DetailProductSTR;
+Var
+  request: DetailProductRequest;
+  response: DetailProduct;
+  alc: ProductIdentifierType; //ProductIdentifierType; //FilterType;// ProductIdentifierTypeEnum;// FilterType;// IdentifierChoiceType; //IdentifierChoiceType; //ProductIdentifierType; //FilterIdType;// AlchemyIdentifierType;
+  Serv: GSDDServiceSoap;
+  Resp, Casa_Farmaceutica, BRAND, Product, Strength, Token1, Token2, Token3: String;
+  ProductID: Integer;
+begin
+  With DM do
+  begin
+      ProductID := CDSListProductsPRODUCT_ID.Value; // AlchemyProductIdentifierResult(CDSInventarioNDC.Value);
+      if ProductID > 0 then
+      begin
+        alc := ProductIdentifierType.Create;
+        alc.IdentifierType := ProductIdentifierEnum.ProductID;
+        alc.Identifier := IntToStr(ProductID);
+        request := DetailProductRequest.Create;
+        request.ProductIdentifier := alc;
+
+        With DetailProductRequest do
+        begin
+          Serv  :=  GetGSDDServiceSoap(False,'', FrmMain.HTTPRIO2);
+          Response := Serv.DetailProduct(DetailProductRequest(request));
+        end;
+        Casa_Farmaceutica := response.Detail.Marketer;
+        if Trim(Casa_Farmaceutica) = '' then Casa_Farmaceutica := 'N/A';
+        if response.Detail.BrandGenericStatus = 'Brand' then BRAND := 'T' else BRAND := 'F';
+
+        if (DSInventario.State = dsEdit) or (DSInventario.State = dsInsert) then
+        begin
+          CDSInventarioCASA_FARMACEUTICA.VAlue := UpperCase(Copy(Casa_Farmaceutica,1, 35));
+          CDSInventarioBRAND.Value := Brand;
+          CDSInventarioCONTROLADO.Value := UpperCase(response.Detail.LegendStatus);
+        end;
+        //if response.MarketStatus.OnMarket() then CDSInventarioMARKET_STATUS.Value := 'On Market'
+        //else CDSInventarioMARKET_STATUS.Value := 'Off Market';
+      end;
+
+  end;
+end;
+
+
+function TGDDS5Routines.PatientEducation(APID, NDC, LanguageStr, Option: String; CreateForm: Boolean): String;
+Var
+  request: DrugIdentifierLanguageType; ///CONTENT ContentPatientEducationRequest;// ContentLanguageType;
+  response: ContentPatientEducation; //PatientEducationType;
+  alc: ContentPatientEducationRequest;// IdentifierChoiceType;
+  Serv: GSDDServiceSoap;
+  Info: String;
+begin
+  With DM do
+  begin
+    if Trim(NDC) > '' then
+    begin
+      CDSInventario2.Close;
+      CDSInventario2.CommandText := 'Select * from InventarioPiso where NDC = ' + #39 + Trim(NDC) + #39;
+      CDSInventario2.Open;
+    end;
+    if CDSSetupGoldStandardActive.Value = True then
+    begin
+      Try
+         alc := ContentPatientEducationRequest.Create;
+         alc.SheetIdentifier := DrugIdentifierLanguageType.Create;
+         alc.SheetIdentifier.DrugIdentifier := PackageProductConceptGpcType.Create;
+         alc.SheetIdentifier.DrugIdentifier.Package_ := PackageIdentifierType.Create;
+         alc.SheetIdentifier.DrugIdentifier.Package_.Identifier := NDC;
+         alc.SheetIdentifier.DrugIdentifier.Package_.IdentifierType := PackageIdentifierEnum.NDC11;
+         if LanguageStr = 'English' then
+           alc.SheetIdentifier.LanguageCode := 'en-US'
+         else
+           alc.SheetIdentifier.LanguageCode := 'es-ES';
+
+        With ContentPatientEducation do
+        begin
+          Serv  :=  GetGSDDServiceSoap(False,'', FrmMain.HTTPRIO2);
+          Response := Serv.ContentPatientEducation(ContentPatientEducationRequest(alc));
+        end;
+
+        {FrmInfoGS  := TFrmInfoGS.create(Application);
+        With FrmInfoGS do
+        begin
+          if Option = 'Description' then
+          begin
+            FrmInfoGS.Caption := 'Description';
+            MemoInteraction.Lines.Add(Trim(DM.CDSInventario2DESCRIPCION.VALUE) + ' / ' + Response.PatientEducationSheet.SheetName);
+            MemoInteraction.Lines.Add(Response.PatientEducationSheet.DescriptionHeader);
+            MemoInteraction.Lines.Add(Response.PatientEducationSheet.Description);
+            MemoInteraction.Lines.Add(Response.PatientEducationSheet.DescriptionFooter);
+          end;
+          if Option = 'Contradiction' then
+          begin
+            FrmInfoGS.Caption := 'Contradictions!';
+            MemoInteraction.Lines.Add(Trim(DM.CDSInventario2DESCRIPCION.VALUE) + ' / ' + Response.PatientEducationSheet.SheetName);
+            MemoInteraction.Lines.Add(Response.PatientEducationSheet.ContraindicationsHeader);
+            MemoInteraction.Lines.Add(Response.PatientEducationSheet.Contraindications);
+          end;
+          if Option = 'Administration' then
+          begin
+            FrmInfoGS.Caption := 'Administration';
+            MemoInteraction.Lines.Add(Trim(DM.CDSInventario2DESCRIPCION.VALUE) + ' / ' + Response.PatientEducationSheet.SheetName);
+            MemoInteraction.Lines.Add(Response.PatientEducationSheet.AdministrationHeader);
+            MemoInteraction.Lines.Add(Response.PatientEducationSheet.Administration);
+            MemoInteraction.Lines.Add(Response.PatientEducationSheet.AdministrationFooter);
+          end;
+          if Option ='Missed Dose' then
+          begin
+            FrmInfoGS.Caption := 'Missed Dose';
+            MemoInteraction.Lines.Add(Trim(DM.CDSInventario2DESCRIPCION.VALUE) + ' / ' + Response.PatientEducationSheet.SheetName);
+            MemoInteraction.Lines.Add(Response.PatientEducationSheet.MissedDoseHeader);
+            MemoInteraction.Lines.Add(Response.PatientEducationSheet.MissedDose);
+            MemoInteraction.Lines.Add(Response.PatientEducationSheet.MissedDoseFooter);
+          end;
+          if Option ='Monitoring' then
+          begin
+            FrmInfoGS.Caption := 'Monitoring';
+            MemoInteraction.Lines.Add(Trim(DM.CDSInventario2DESCRIPCION.VALUE) + ' / ' + Response.PatientEducationSheet.SheetName);
+            MemoInteraction.Lines.Add(Response.PatientEducationSheet.MonitoringHeader);
+            MemoInteraction.Lines.Add(Response.PatientEducationSheet.Monitoring);
+            MemoInteraction.Lines.Add(Response.PatientEducationSheet.MonitoringFooter);
+          end;
+          if Option ='SideEffects' then
+          begin
+            FrmInfoGS.Caption := 'Side Effects';
+            MemoInteraction.Lines.Add(Trim(DM.CDSInventario2DESCRIPCION.VALUE) + ' / ' + Response.PatientEducationSheet.SheetName);
+            MemoInteraction.Lines.Add(Response.PatientEducationSheet.SideEffectsHeader);
+            MemoInteraction.Lines.Add(Response.PatientEducationSheet.SideEffects);
+            MemoInteraction.Lines.Add(Response.PatientEducationSheet.SideEffectsFooter);
+            Result := Response.PatientEducationSheet.SideEffects;
+          end;
+          if Option ='Storage' then
+          begin
+            FrmInfoGS.Caption := 'Storage';
+            MemoInteraction.Lines.Add(Trim(DM.CDSInventario2DESCRIPCION.VALUE) + ' / ' + Response.PatientEducationSheet.SheetName);
+            MemoInteraction.Lines.Add(Response.PatientEducationSheet.StorageHeader);
+            MemoInteraction.Lines.Add(Response.PatientEducationSheet.Storage);
+            MemoInteraction.Lines.Add(Response.PatientEducationSheet.StorageFooter);
+          end;
+          if Option ='Education' then
+          begin
+            MemoInteraction.Lines.Add(Trim(DM.CDSInventario2DESCRIPCION.VALUE) + ' / ' + Response.PatientEducationSheet.SheetName);
+            MemoInteraction.Lines.Add(Response.PatientEducationSheet.DescriptionHeader);
+            MemoInteraction.Lines.Add(Response.PatientEducationSheet.Description);
+            MemoInteraction.Lines.Add(Response.PatientEducationSheet.DescriptionFooter);
+            MemoInteraction.Lines.Add(Response.PatientEducationSheet.ContraindicationsHeader);
+            MemoInteraction.Lines.Add(Response.PatientEducationSheet.Contraindications);
+            MemoInteraction.Lines.Add(Response.PatientEducationSheet.AdministrationHeader);
+            MemoInteraction.Lines.Add(Response.PatientEducationSheet.Administration);
+            MemoInteraction.Lines.Add(Response.PatientEducationSheet.AdministrationFooter);
+            MemoInteraction.Lines.Add(Response.PatientEducationSheet.MissedDoseHeader);
+            MemoInteraction.Lines.Add(Response.PatientEducationSheet.MissedDose);
+            MemoInteraction.Lines.Add(Response.PatientEducationSheet.MissedDoseFooter);
+            MemoInteraction.Lines.Add(Response.PatientEducationSheet.MonitoringHeader);
+            MemoInteraction.Lines.Add(Response.PatientEducationSheet.Monitoring);
+            MemoInteraction.Lines.Add(Response.PatientEducationSheet.MonitoringFooter);
+            MemoInteraction.Lines.Add(Response.PatientEducationSheet.SideEffectsHeader);
+            MemoInteraction.Lines.Add(Response.PatientEducationSheet.SideEffects);
+            MemoInteraction.Lines.Add(Response.PatientEducationSheet.SideEffectsFooter);
+            MemoInteraction.Lines.Add(Response.PatientEducationSheet.StorageHeader);
+            MemoInteraction.Lines.Add(Response.PatientEducationSheet.Storage);
+            MemoInteraction.Lines.Add(Response.PatientEducationSheet.StorageFooter);
+            Result := Trim(DM.CDSInventario2DESCRIPCION.VALUE) + ' / ' + Response.PatientEducationSheet.SheetName
+            +  Trim(Response.PatientEducationSheet.DescriptionHeader)
+            +  Trim(Response.PatientEducationSheet.Description) + chr(13)
+            +  Trim(Response.PatientEducationSheet.DescriptionFooter) + ' '
+            //+  Trim(Response.PatientEducationSheet.ContraindicationsHeader) + ' '
+            //+  Trim(Response.PatientEducationSheet.Contraindications)  + ' '
+            //+  Trim(Response.PatientEducationSheet.ContraindicationsFooter) + chr(13)
+            +  Trim(Response.PatientEducationSheet.AdministrationHeader) + ' '
+            +  Trim(Response.PatientEducationSheet.Administration) + ' '
+            +  Trim(Response.PatientEducationSheet.AdministrationFooter) + chr(13)
+            +  Trim(Response.PatientEducationSheet.MissedDoseHeader) + ' '
+            +  Trim(Response.PatientEducationSheet.MissedDose) + ' '
+            +  Trim(Response.PatientEducationSheet.MissedDoseFooter) + chr(13)
+            +  Trim(Response.PatientEducationSheet.MonitoringHeader) + ' '
+            +  Trim(Response.PatientEducationSheet.Monitoring) + ' '
+            +  Trim(Response.PatientEducationSheet.MonitoringFooter) + chr(13)
+            +  Trim(Response.PatientEducationSheet.SideEffectsHeader) + ' '
+            +  Trim(Response.PatientEducationSheet.SideEffects) + ' '
+            +  Trim(Response.PatientEducationSheet.SideEffectsFooter) + chr(13)
+            +  Trim(Response.PatientEducationSheet.StorageHeader) + ' '
+            +  Trim(Response.PatientEducationSheet.Storage) +  ' '
+            +  Trim(Response.PatientEducationSheet.StorageFooter);
+          end;
+          if CreateForm = True then
+          begin
+            PopupMode := pmExplicit;
+            PopupParent := FrmMain;
+            ShowModal;
+          end;
+          FrmInfoGS := Nil;
+          FrmInfoGS.Free;
+
+        end;}
+      Except
+        if CreateForm = True then ShowMessage('No Information available');
+      End;
+    end;
+  end;
+end;
+
+
+Procedure TGDDS5Routines.ListAllergy(Token: String);
+Var
+  request: ListAllergySubstanceClassesRequest;
+  response: ListAllergySubstanceClasses;
+  //IdentifierAxel: IdentifierChoiceType;//  IdentifierChoiceType;
+  alc: ProductFilterType;// ProductIdentifierType; //AlchemyIdentifierType;
+  Serv: GSDDServiceSoap;
+  Info: String;
+  I, Counter: Integer;
+begin
+  With DM do
+  begin
+    request := ListAllergySubstanceClassesRequest.Create;
+    request.NameFilter := Trim(Token) + '%';
+    With ListAllergySubstanceClassesRequest do
+    begin
+      Serv  :=  GetGSDDServiceSoap(False,'', FrmMain.HTTPRIO2);
+      Response := Serv.ListAllergySubstanceClasses(ListAllergySubstanceClassesRequest(request));
+    end;
+    Counter := Length(response.AllergySubstanceClass);
+    CDSAlergyList.Active := False;
+    CDSAlergyList.Active := True;
+    for I := 0 to Counter - 1 do
+    begin
+      CDSAlergyList.Insert;
+      CDSAlergyListAllergy.Value := response.AllergySubstanceClass[I].Name_;
+      CDSAlergyListID.Value :=  response.AllergySubstanceClass[I].Identifier;
+      CDSAlergyList.Post;
+    end;
+  end;
+end;
+
+
+function TGDDS5Routines.DrugInteractions(NoCliente: Integer; Forma: String):Boolean;
+Var
+  ExcludeExpiradas: String;
+  Serv: GSDDServiceSoap;//AlchemyServiceSoap;
+  //req: ClinicalRequest;// AlchemyClinical;
+  Request: ClinicalRequest;
+  alc: IdentifierClinicalType;
+  D: TXSDate;
+  Counter, CounterInteraction, Counter_Drug, Counter_Product,
+  Counter_LifeStyle: Integer;
+  //IdentifierAxel2: PrescribedType;
+  //IdentifierPrescribing: PrescribedType;
+  response: Clinical;
+  I, I_Interaction, I_Drug, I_Product, I_lifeStyle: Integer;
+  I_Inter: Integer;
+
+  PIC: Array_Of_ProductIdentifierClinicalType;
+
+  PI0, PI1,PI2, PI3, PI4, PI5, PI6, PI7, PI8, PI9, PI10,
+  PI11, PI12, PI13, PI14, PI15, PI16, PI17, PI18, PI19, PI20,
+  PI21, PI22, PI23, PI24, PI25, PI26, PI27, PI28, PI29, PI30: ProductIdentifierClinicalType;
+
+  PIP0, PIP1,PIP2, PIP3, PIP4, PIP5, PIP6, PIP7, PIP8, PIP9, PIP10,
+  PIP11, PIP12, PIP13, PIP14, PIP15, PIP16, PIP17, PIP18, PIP19, PIP20,
+  PIP21, PIP22, PIP23, PIP24, PIP25, PIP26, PIP27, PIP28, PIP29, PIP30: ProductIdentifierClinicalType;
+
+  API0, API1, API2, API3, API4, API5, API6, API7, API8, API9:  AllergyAllergySubstanceClassType; // ProductIdentifierType; // AlchemyIdentifierType;
+  ShowInteractions: Boolean;
+  SeverityDrugInteraction: Integer;
+  StopInteraction: Boolean;
+  AllergyCount,  I_Allergy: Integer;
+begin
+  StopInteraction := False;
+  Result := True;
+  With DM do
+  begin
+
+    CDSPrescriptions4.Close;
+    CDSPrescriptions4.CommandText := 'Select Distinct NDC from Prescriptions where NumeroCliente = ' + IntToStr(NoCliente) +
+    ' and ((FECHARECETA + DIASSUPLIDOS) > (' + chr(39) +  DateToStr(Date) + chr(39) + ')) order by NDC';
+    CDSPrescriptions4.Open;
+
+    for I := 0 to CDSPrescriptions4.RecordCount - 1 do
+    begin
+      if I = 0 then
+      begin
+        PI0 :=  ProductIdentifierClinicalType.Create;
+        PI0.ProductIdentifier := ProductIdentifierType.Create;
+        PI0.ProductIdentifier.IdentifierType := ProductIdentifierEnum.NDC9;
+        PI0.ProductIdentifier.Identifier := Copy(CDSPrescriptions4NDC.Value, 1, 9);
+      end;
+      if I = 1 then
+      begin
+        PI1 :=  ProductIdentifierClinicalType.Create;
+        PI1.ProductIdentifier := ProductIdentifierType.Create;
+        PI1.ProductIdentifier.IdentifierType := ProductIdentifierEnum.NDC9;
+        PI1.ProductIdentifier.Identifier := Copy(CDSPrescriptions4NDC.Value, 1, 9);
+      end;
+      if I = 2 then
+      begin
+        PI2 :=  ProductIdentifierClinicalType.Create;
+        PI2.ProductIdentifier := ProductIdentifierType.Create;
+        PI2.ProductIdentifier.IdentifierType := ProductIdentifierEnum.NDC9;
+        PI2.ProductIdentifier.Identifier := Copy(CDSPrescriptions4NDC.Value, 1, 9);
+      end;
+      if I = 3 then
+      begin
+        PI3 :=  ProductIdentifierClinicalType.Create;
+        PI3.ProductIdentifier := ProductIdentifierType.Create;
+        PI3.ProductIdentifier.IdentifierType := ProductIdentifierEnum.NDC9;
+        PI3.ProductIdentifier.Identifier := Copy(CDSPrescriptions4NDC.Value, 1, 9);
+      end;
+      if I = 4 then
+      begin
+        PI4 :=  ProductIdentifierClinicalType.Create;
+        PI4.ProductIdentifier := ProductIdentifierType.Create;
+        PI4.ProductIdentifier.IdentifierType := ProductIdentifierEnum.NDC9;
+        PI4.ProductIdentifier.Identifier := Copy(CDSPrescriptions4NDC.Value, 1, 9);
+      end;
+      if I = 5 then
+      begin
+        PI5 :=  ProductIdentifierClinicalType.Create;
+        PI5.ProductIdentifier := ProductIdentifierType.Create;
+        PI5.ProductIdentifier.IdentifierType := ProductIdentifierEnum.NDC9;
+        PI5.ProductIdentifier.Identifier := Copy(CDSPrescriptions4NDC.Value, 1, 9);
+      end;
+      if I = 6 then
+      begin
+        PI6 :=  ProductIdentifierClinicalType.Create;
+        PI6.ProductIdentifier := ProductIdentifierType.Create;
+        PI6.ProductIdentifier.IdentifierType := ProductIdentifierEnum.NDC9;
+        PI6.ProductIdentifier.Identifier := Copy(CDSPrescriptions4NDC.Value, 1, 9);
+      end;
+      if I = 7 then
+      begin
+        PI7 :=  ProductIdentifierClinicalType.Create;
+        PI7.ProductIdentifier := ProductIdentifierType.Create;
+        PI7.ProductIdentifier.IdentifierType := ProductIdentifierEnum.NDC9;
+        PI7.ProductIdentifier.Identifier := Copy(CDSPrescriptions4NDC.Value, 1, 9);
+      end;
+      if I = 8 then
+      begin
+        PI8 :=  ProductIdentifierClinicalType.Create;
+        PI8.ProductIdentifier := ProductIdentifierType.Create;
+        PI8.ProductIdentifier.IdentifierType := ProductIdentifierEnum.NDC9;
+        PI8.ProductIdentifier.Identifier := Copy(CDSPrescriptions4NDC.Value, 1, 9);
+      end;
+      if I = 9 then
+      begin
+        PI9 :=  ProductIdentifierClinicalType.Create;
+        PI9.ProductIdentifier := ProductIdentifierType.Create;
+        PI9.ProductIdentifier.IdentifierType := ProductIdentifierEnum.NDC9;
+        PI9.ProductIdentifier.Identifier := Copy(CDSPrescriptions4NDC.Value, 1, 9);
+      end;
+      if I = 10 then
+      begin
+        PI10 :=  ProductIdentifierClinicalType.Create;
+        PI10.ProductIdentifier := ProductIdentifierType.Create;
+        PI10.ProductIdentifier.IdentifierType := ProductIdentifierEnum.NDC9;
+        PI10.ProductIdentifier.Identifier := Copy(CDSPrescriptions4NDC.Value, 1, 9);
+      end;
+      if I = 11 then
+      begin
+        PI11 :=  ProductIdentifierClinicalType.Create;
+        PI11.ProductIdentifier := ProductIdentifierType.Create;
+        PI11.ProductIdentifier.IdentifierType := ProductIdentifierEnum.NDC9;
+        PI11.ProductIdentifier.Identifier := Copy(CDSPrescriptions4NDC.Value, 1, 9);
+      end;
+      if I = 12 then
+      begin
+        PI12 :=  ProductIdentifierClinicalType.Create;
+        PI12.ProductIdentifier := ProductIdentifierType.Create;
+        PI12.ProductIdentifier.IdentifierType := ProductIdentifierEnum.NDC9;
+        PI12.ProductIdentifier.Identifier := Copy(CDSPrescriptions4NDC.Value, 1, 9);;
+      end;
+      if I = 13 then
+      begin
+        PI13 :=  ProductIdentifierClinicalType.Create;
+        PI13.ProductIdentifier := ProductIdentifierType.Create;
+        PI13.ProductIdentifier.IdentifierType := ProductIdentifierEnum.NDC9;
+        PI13.ProductIdentifier.Identifier := Copy(CDSPrescriptions4NDC.Value, 1, 9);
+      end;
+      if I = 14 then
+      begin
+        PI14 :=  ProductIdentifierClinicalType.Create;
+        PI14.ProductIdentifier := ProductIdentifierType.Create;
+        PI14.ProductIdentifier.IdentifierType := ProductIdentifierEnum.NDC9;
+        PI14.ProductIdentifier.Identifier := Copy(CDSPrescriptions4NDC.Value, 1, 9);
+      end;
+      if I = 15 then
+      begin
+        PI15 :=  ProductIdentifierClinicalType.Create;
+        PI15.ProductIdentifier := ProductIdentifierType.Create;
+        PI15.ProductIdentifier.IdentifierType := ProductIdentifierEnum.NDC9;
+        PI15.ProductIdentifier.Identifier := Copy(CDSPrescriptions4NDC.Value, 1, 9);
+      end;
+      if I = 16 then
+      begin
+        PI16 :=  ProductIdentifierClinicalType.Create;
+        PI16.ProductIdentifier := ProductIdentifierType.Create;
+        PI16.ProductIdentifier.IdentifierType := ProductIdentifierEnum.NDC9;
+        PI16.ProductIdentifier.Identifier := Copy(CDSPrescriptions4NDC.Value, 1, 9);
+      end;
+      if I = 17 then
+      begin
+        PI17 :=  ProductIdentifierClinicalType.Create;
+        PI17.ProductIdentifier := ProductIdentifierType.Create;
+        PI17.ProductIdentifier.IdentifierType := ProductIdentifierEnum.NDC9;
+        PI17.ProductIdentifier.Identifier := Copy(CDSPrescriptions4NDC.Value, 1, 9);
+      end;
+      if I = 18 then
+      begin
+        PI18 :=  ProductIdentifierClinicalType.Create;
+        PI18.ProductIdentifier := ProductIdentifierType.Create;
+        PI18.ProductIdentifier.IdentifierType := ProductIdentifierEnum.NDC9;
+        PI18.ProductIdentifier.Identifier := Copy(CDSPrescriptions4NDC.Value, 1, 9);
+      end;
+      if I = 19 then
+      begin
+        PI19 :=  ProductIdentifierClinicalType.Create;
+        PI19.ProductIdentifier := ProductIdentifierType.Create;
+        PI19.ProductIdentifier.IdentifierType := ProductIdentifierEnum.NDC9;
+        PI19.ProductIdentifier.Identifier := Copy(CDSPrescriptions4NDC.Value, 1, 9);
+      end;
+      if I = 20 then
+      begin
+        PI20 :=  ProductIdentifierClinicalType.Create;
+        PI20.ProductIdentifier := ProductIdentifierType.Create;
+        PI20.ProductIdentifier.IdentifierType := ProductIdentifierEnum.NDC9;
+        PI20.ProductIdentifier.Identifier := Copy(CDSPrescriptions4NDC.Value, 1, 9);
+      end;
+      if I = 21 then
+      begin
+        PI21 :=  ProductIdentifierClinicalType.Create;
+        PI21.ProductIdentifier := ProductIdentifierType.Create;
+        PI21.ProductIdentifier.IdentifierType := ProductIdentifierEnum.NDC9;
+        PI21.ProductIdentifier.Identifier := Copy(CDSPrescriptions4NDC.Value, 1, 9);
+      end;
+      if I = 22 then
+      begin
+        PI22 :=  ProductIdentifierClinicalType.Create;
+        PI22.ProductIdentifier := ProductIdentifierType.Create;
+        PI22.ProductIdentifier.IdentifierType := ProductIdentifierEnum.NDC9;
+        PI22.ProductIdentifier.Identifier := Copy(CDSPrescriptions4NDC.Value, 1, 9);
+      end;
+      if I = 23 then
+      begin
+        PI23 :=  ProductIdentifierClinicalType.Create;
+        PI23.ProductIdentifier := ProductIdentifierType.Create;
+        PI23.ProductIdentifier.IdentifierType := ProductIdentifierEnum.NDC9;
+        PI23.ProductIdentifier.Identifier := Copy(CDSPrescriptions4NDC.Value, 1, 9);
+      end;
+      if I = 24 then
+      begin
+        PI24 :=  ProductIdentifierClinicalType.Create;
+        PI24.ProductIdentifier := ProductIdentifierType.Create;
+        PI24.ProductIdentifier.IdentifierType := ProductIdentifierEnum.NDC9;
+        PI24.ProductIdentifier.Identifier := Copy(CDSPrescriptions4NDC.Value, 1, 9);
+      end;
+      if I = 25 then
+      begin
+        PI25 :=  ProductIdentifierClinicalType.Create;
+        PI25.ProductIdentifier := ProductIdentifierType.Create;
+        PI25.ProductIdentifier.IdentifierType := ProductIdentifierEnum.NDC9;
+        PI25.ProductIdentifier.Identifier := Copy(CDSPrescriptions4NDC.Value, 1, 9);
+      end;
+      if I = 26 then
+      begin
+        PI26 :=  ProductIdentifierClinicalType.Create;
+        PI26.ProductIdentifier := ProductIdentifierType.Create;
+        PI26.ProductIdentifier.IdentifierType := ProductIdentifierEnum.NDC9;
+        PI26.ProductIdentifier.Identifier := Copy(CDSPrescriptions4NDC.Value, 1, 9);
+      end;
+      if I = 27 then
+      begin
+        PI27 :=  ProductIdentifierClinicalType.Create;
+        PI27.ProductIdentifier := ProductIdentifierType.Create;
+        PI27.ProductIdentifier.IdentifierType := ProductIdentifierEnum.NDC9;
+        PI27.ProductIdentifier.Identifier := Copy(CDSPrescriptions4NDC.Value, 1, 9);
+      end;
+      if I = 28 then
+      begin
+        PI28 :=  ProductIdentifierClinicalType.Create;
+        PI28.ProductIdentifier := ProductIdentifierType.Create;
+        PI28.ProductIdentifier.IdentifierType := ProductIdentifierEnum.NDC9;
+        PI28.ProductIdentifier.Identifier := Copy(CDSPrescriptions4NDC.Value, 1, 9);
+      end;
+      if I = 29 then
+      begin
+        PI29 :=  ProductIdentifierClinicalType.Create;
+        PI29.ProductIdentifier := ProductIdentifierType.Create;
+        PI29.ProductIdentifier.IdentifierType := ProductIdentifierEnum.NDC9;
+        PI29.ProductIdentifier.Identifier := Copy(CDSPrescriptions4NDC.Value, 1, 9);
+      end;
+
+      CDSPrescriptions4.Next;
+    end;
+
+
+    Counter := 0;
+    Request := ClinicalRequest.Create;
+    Request.Prescribed := ClinicalPrescribedType.Create;
+    I := CDSPrescriptions4.RecordCount - 1;
+      case I of
+        0: Request.Prescribed.Product := array_of_ProductIdentifierClinicalType.Create(PI0);
+        1: Request.Prescribed.Product := array_of_ProductIdentifierClinicalType.Create(PI0, PI1);
+        2: Request.Prescribed.Product := array_of_ProductIdentifierClinicalType.Create(PI0, PI1, PI2);
+        3: Request.Prescribed.Product := array_of_ProductIdentifierClinicalType.Create(PI0, PI1, PI2, PI3);
+        4: Request.Prescribed.Product := array_of_ProductIdentifierClinicalType.Create(PI0, PI1, PI2, PI3, PI4);
+        5: Request.Prescribed.Product := array_of_ProductIdentifierClinicalType.Create(PI0, PI1, PI2, PI3, PI4, PI5);
+        6: Request.Prescribed.Product := array_of_ProductIdentifierClinicalType.Create(PI0, PI1, PI2, PI3, PI4, PI5, PI6);
+        7: Request.Prescribed.Product := array_of_ProductIdentifierClinicalType.Create(PI0, PI1, PI2, PI3, PI4, PI5, PI6, PI7);
+        8: Request.Prescribed.Product := array_of_ProductIdentifierClinicalType.Create(PI0, PI1, PI2, PI3, PI4, PI5, PI6, PI7, PI8);
+        9: Request.Prescribed.Product := array_of_ProductIdentifierClinicalType.Create(PI0, PI1, PI2, PI3, PI4, PI5, PI6, PI7, PI8, PI9);
+        10: Request.Prescribed.Product := array_of_ProductIdentifierClinicalType.Create(PI0, PI1, PI2, PI3, PI4, PI5, PI6, PI7, PI8, PI9, PI10);
+        11: Request.Prescribed.Product := array_of_ProductIdentifierClinicalType.Create(PI0, PI1, PI2, PI3, PI4, PI5, PI6, PI7, PI8, PI9, PI10, PI11);
+        12: Request.Prescribed.Product := array_of_ProductIdentifierClinicalType.Create(PI0, PI1, PI2, PI3, PI4, PI5, PI6, PI7, PI8, PI9, PI10, PI11, PI12);
+        13: Request.Prescribed.Product := array_of_ProductIdentifierClinicalType.Create(PI0, PI1, PI2, PI3, PI4, PI5, PI6, PI7, PI8, PI9, PI10, PI11, PI12, PI13);
+        14: Request.Prescribed.Product := array_of_ProductIdentifierClinicalType.Create(PI0, PI1, PI2, PI3, PI4, PI5, PI6, PI7, PI8, PI9, PI10, PI11, PI12, PI13, PI14);
+        15: Request.Prescribed.Product := array_of_ProductIdentifierClinicalType.Create(PI0, PI1, PI2, PI3, PI4, PI5, PI6, PI7, PI8, PI9, PI10, PI11, PI12, PI13, PI14, PI15);
+        16: Request.Prescribed.Product := array_of_ProductIdentifierClinicalType.Create(PI0, PI1, PI2, PI3, PI4, PI5, PI6, PI7, PI8, PI9, PI10, PI11, PI12, PI13, PI14, PI15, PI16);
+        17: Request.Prescribed.Product := array_of_ProductIdentifierClinicalType.Create(PI0, PI1, PI2, PI3, PI4, PI5, PI6, PI7, PI8, PI9, PI10, PI11, PI12, PI13, PI14, PI15, PI16, PI17);
+        18: Request.Prescribed.Product := array_of_ProductIdentifierClinicalType.Create(PI0, PI1, PI2, PI3, PI4, PI5, PI6, PI7, PI8, PI9, PI10, PI11, PI12, PI13, PI14, PI15, PI16, PI17, PI18);
+        19: Request.Prescribed.Product := array_of_ProductIdentifierClinicalType.Create(PI0, PI1, PI2, PI3, PI4, PI5, PI6, PI7, PI8, PI9, PI10, PI11, PI12, PI13, PI14, PI15, PI16, PI17, PI18, PI19);
+        20: Request.Prescribed.Product := array_of_ProductIdentifierClinicalType.Create(PI0, PI1, PI2, PI3, PI4, PI5, PI6, PI7, PI8, PI9, PI10, PI11, PI12, PI13, PI14, PI15, PI16, PI17, PI18, PI19, PI20);
+      end;
+    //======================== Prescribed =======================================
+    //Request.Prescribed := IdentifierAxel2;
+
+    CDSRxtemp1_Temp.Close;
+    CDSRxTemp1_Temp.CommandText := 'Select * from Rxtemp1 where NumeroCliente = ' + IntToStr(NoCliente) + ' and Instancia = ' + IntToStr(1);
+    CDSRxTemp1_Temp.Open;
+
+
+    for I := 0 to CDSRxTemp1_Temp.RecordCount - 1 do
+    begin
+      if I = 0 then
+      begin
+        PIP0 :=  ProductIdentifierClinicalType.Create;
+        PIP0.ProductIdentifier := ProductIdentifierType.Create;
+        PIP0.ProductIdentifier.IdentifierType := ProductIdentifierEnum.NDC9;
+        PIP0.ProductIdentifier.Identifier := Copy(CDSRxTemp1_TempNDC.Value, 1, 9);
+      end;
+      if I = 1 then
+      begin
+        PIP1 :=  ProductIdentifierClinicalType.Create;
+        PIP1.ProductIdentifier := ProductIdentifierType.Create;
+        PIP1.ProductIdentifier.IdentifierType := ProductIdentifierEnum.NDC9;
+        PIP1.ProductIdentifier.Identifier := Copy(CDSRxTemp1_TempNDC.Value, 1, 9);
+      end;
+      if I = 2 then
+      begin
+        PIP2 :=  ProductIdentifierClinicalType.Create;
+        PIP2.ProductIdentifier := ProductIdentifierType.Create;
+        PIP2.ProductIdentifier.IdentifierType := ProductIdentifierEnum.NDC9;
+        PIP2.ProductIdentifier.Identifier := Copy(CDSRxTemp1_TempNDC.Value, 1, 9);
+      end;
+      if I = 3 then
+      begin
+        PIP3 :=  ProductIdentifierClinicalType.Create;
+        PIP3.ProductIdentifier := ProductIdentifierType.Create;
+        PIP3.ProductIdentifier.IdentifierType := ProductIdentifierEnum.NDC9;
+        PIP3.ProductIdentifier.Identifier := Copy(CDSRxTemp1_TempNDC.Value, 1, 9);
+      end;
+      if I = 4 then
+      begin
+        PIP4 :=  ProductIdentifierClinicalType.Create;
+        PIP4.ProductIdentifier := ProductIdentifierType.Create;
+        PIP4.ProductIdentifier.IdentifierType := ProductIdentifierEnum.NDC9;
+        PIP4.ProductIdentifier.Identifier := Copy(CDSRxTemp1_TempNDC.Value, 1, 9);
+      end;
+      if I = 5 then
+      begin
+        PIP5 :=  ProductIdentifierClinicalType.Create;
+        PIP5.ProductIdentifier := ProductIdentifierType.Create;
+        PIP5.ProductIdentifier.IdentifierType := ProductIdentifierEnum.NDC9;
+        PIP5.ProductIdentifier.Identifier := Copy(CDSRxTemp1_TempNDC.Value, 1, 9);
+      end;
+      if I = 6 then
+      begin
+        PIP6 :=  ProductIdentifierClinicalType.Create;
+        PIP6.ProductIdentifier := ProductIdentifierType.Create;
+        PIP6.ProductIdentifier.IdentifierType := ProductIdentifierEnum.NDC9;
+        PIP6.ProductIdentifier.Identifier := Copy(CDSRxTemp1_TempNDC.Value, 1, 9);
+      end;
+      if I = 7 then
+      begin
+        PIP7 :=  ProductIdentifierClinicalType.Create;
+        PIP7.ProductIdentifier := ProductIdentifierType.Create;
+        PIP7.ProductIdentifier.IdentifierType := ProductIdentifierEnum.NDC9;
+        PIP7.ProductIdentifier.Identifier := Copy(CDSRxTemp1_TempNDC.Value, 1, 9);
+      end;
+      if I = 8 then
+      begin
+        PIP8 :=  ProductIdentifierClinicalType.Create;
+        PIP8.ProductIdentifier := ProductIdentifierType.Create;
+        PIP8.ProductIdentifier.IdentifierType := ProductIdentifierEnum.NDC9;
+        PIP8.ProductIdentifier.Identifier := Copy(CDSRxTemp1_TempNDC.Value, 1, 9);
+      end;
+      if I = 9 then
+      begin
+        PIP9 :=  ProductIdentifierClinicalType.Create;
+        PIP9.ProductIdentifier := ProductIdentifierType.Create;
+        PIP9.ProductIdentifier.IdentifierType := ProductIdentifierEnum.NDC9;
+        PIP9.ProductIdentifier.Identifier := Copy(CDSRxTemp1_TempNDC.Value, 1, 9);
+      end;
+      if I = 10 then
+      begin
+        PIP10 :=  ProductIdentifierClinicalType.Create;
+        PIP10.ProductIdentifier := ProductIdentifierType.Create;
+        PIP10.ProductIdentifier.IdentifierType := ProductIdentifierEnum.NDC9;
+        PIP10.ProductIdentifier.Identifier := Copy(CDSRxTemp1_TempNDC.Value, 1, 9);
+      end;
+      if I = 11 then
+      begin
+        PIP11 :=  ProductIdentifierClinicalType.Create;
+        PIP11.ProductIdentifier := ProductIdentifierType.Create;
+        PIP11.ProductIdentifier.IdentifierType := ProductIdentifierEnum.NDC9;
+        PIP11.ProductIdentifier.Identifier := Copy(CDSRxTemp1_TempNDC.Value, 1, 9);
+      end;
+      if I = 12 then
+      begin
+        PIP12 :=  ProductIdentifierClinicalType.Create;
+        PIP12.ProductIdentifier := ProductIdentifierType.Create;
+        PIP12.ProductIdentifier.IdentifierType := ProductIdentifierEnum.NDC9;
+        PIP12.ProductIdentifier.Identifier := Copy(CDSRxTemp1_TempNDC.Value, 1, 9);
+      end;
+      if I = 13 then
+      begin
+        PIP13 :=  ProductIdentifierClinicalType.Create;
+        PIP13.ProductIdentifier := ProductIdentifierType.Create;
+        PIP13.ProductIdentifier.IdentifierType := ProductIdentifierEnum.NDC9;
+        PIP13.ProductIdentifier.Identifier := Copy(CDSRxTemp1_TempNDC.Value, 1, 9);
+      end;
+      if I = 14 then
+      begin
+        PIP14 :=  ProductIdentifierClinicalType.Create;
+        PIP14.ProductIdentifier := ProductIdentifierType.Create;
+        PIP14.ProductIdentifier.IdentifierType := ProductIdentifierEnum.NDC9;
+        PIP14.ProductIdentifier.Identifier := Copy(CDSRxTemp1_TempNDC.Value, 1, 9);
+      end;
+      if I = 15 then
+      begin
+        PIP15 :=  ProductIdentifierClinicalType.Create;
+        PIP15.ProductIdentifier := ProductIdentifierType.Create;
+        PIP15.ProductIdentifier.IdentifierType := ProductIdentifierEnum.NDC9;
+        PIP15.ProductIdentifier.Identifier := Copy(CDSRxTemp1_TempNDC.Value, 1, 9);
+      end;
+      if I = 16 then
+      begin
+        PIP16 :=  ProductIdentifierClinicalType.Create;
+        PIP16.ProductIdentifier := ProductIdentifierType.Create;
+        PIP16.ProductIdentifier.IdentifierType := ProductIdentifierEnum.NDC9;
+        PIP16.ProductIdentifier.Identifier := Copy(CDSRxTemp1_TempNDC.Value, 1, 9);
+      end;
+      if I = 17 then
+      begin
+        PIP17 :=  ProductIdentifierClinicalType.Create;
+        PIP17.ProductIdentifier := ProductIdentifierType.Create;
+        PIP17.ProductIdentifier.IdentifierType := ProductIdentifierEnum.NDC9;
+        PIP17.ProductIdentifier.Identifier := Copy(CDSRxTemp1_TempNDC.Value, 1, 9);
+      end;
+      if I = 18 then
+      begin
+        PIP18 :=  ProductIdentifierClinicalType.Create;
+        PIP18.ProductIdentifier := ProductIdentifierType.Create;
+        PIP18.ProductIdentifier.IdentifierType := ProductIdentifierEnum.NDC9;
+        PIP18.ProductIdentifier.Identifier := Copy(CDSRxTemp1_TempNDC.Value, 1, 9);
+      end;
+      if I = 19 then
+      begin
+        PIP19 :=  ProductIdentifierClinicalType.Create;
+        PIP19.ProductIdentifier := ProductIdentifierType.Create;
+        PIP19.ProductIdentifier.IdentifierType := ProductIdentifierEnum.NDC9;
+        PIP19.ProductIdentifier.Identifier := Copy(CDSRxTemp1_TempNDC.Value, 1, 9);
+      end;
+      if I = 20 then
+      begin
+        PIP20 :=  ProductIdentifierClinicalType.Create;
+        PIP20.ProductIdentifier := ProductIdentifierType.Create;
+        PIP20.ProductIdentifier.IdentifierType := ProductIdentifierEnum.NDC9;
+        PIP20.ProductIdentifier.Identifier := Copy(CDSRxTemp1_TempNDC.Value, 1, 9);
+      end;
+      if I = 21 then
+      begin
+        PIP21 :=  ProductIdentifierClinicalType.Create;
+        PIP21.ProductIdentifier := ProductIdentifierType.Create;
+        PIP21.ProductIdentifier.IdentifierType := ProductIdentifierEnum.NDC9;
+        PIP21.ProductIdentifier.Identifier := Copy(CDSRxTemp1_TempNDC.Value, 1, 9);
+      end;
+      if I = 22 then
+      begin
+        PIP22 :=  ProductIdentifierClinicalType.Create;
+        PIP22.ProductIdentifier := ProductIdentifierType.Create;
+        PIP22.ProductIdentifier.IdentifierType := ProductIdentifierEnum.NDC9;
+        PIP22.ProductIdentifier.Identifier := Copy(CDSRxTemp1_TempNDC.Value, 1, 9);
+      end;
+      if I = 23 then
+      begin
+        PIP23 :=  ProductIdentifierClinicalType.Create;
+        PIP23.ProductIdentifier := ProductIdentifierType.Create;
+        PIP23.ProductIdentifier.IdentifierType := ProductIdentifierEnum.NDC9;
+        PIP23.ProductIdentifier.Identifier := Copy(CDSRxTemp1_TempNDC.Value, 1, 9);
+      end;
+      if I = 24 then
+      begin
+        PIP24 :=  ProductIdentifierClinicalType.Create;
+        PIP24.ProductIdentifier := ProductIdentifierType.Create;
+        PIP24.ProductIdentifier.IdentifierType := ProductIdentifierEnum.NDC9;
+        PIP24.ProductIdentifier.Identifier := Copy(CDSRxTemp1_TempNDC.Value, 1, 9);
+      end;
+      if I = 25 then
+      begin
+        PIP25 :=  ProductIdentifierClinicalType.Create;
+        PIP25.ProductIdentifier := ProductIdentifierType.Create;
+        PIP25.ProductIdentifier.IdentifierType := ProductIdentifierEnum.NDC9;
+        PIP25.ProductIdentifier.Identifier := Copy(CDSRxTemp1_TempNDC.Value, 1, 9);
+      end;
+      if I = 26 then
+      begin
+        PIP26 :=  ProductIdentifierClinicalType.Create;
+        PIP26.ProductIdentifier := ProductIdentifierType.Create;
+        PIP26.ProductIdentifier.IdentifierType := ProductIdentifierEnum.NDC9;
+        PIP26.ProductIdentifier.Identifier := Copy(CDSRxTemp1_TempNDC.Value, 1, 9);
+      end;
+      if I = 27 then
+      begin
+        PIP27 :=  ProductIdentifierClinicalType.Create;
+        PIP27.ProductIdentifier := ProductIdentifierType.Create;
+        PIP27.ProductIdentifier.IdentifierType := ProductIdentifierEnum.NDC9;
+        PIP27.ProductIdentifier.Identifier := Copy(CDSRxTemp1_TempNDC.Value, 1, 9);
+      end;
+      if I = 28 then
+      begin
+        PIP28 :=  ProductIdentifierClinicalType.Create;
+        PIP28.ProductIdentifier := ProductIdentifierType.Create;
+        PIP28.ProductIdentifier.IdentifierType := ProductIdentifierEnum.NDC9;
+        PIP28.ProductIdentifier.Identifier := Copy(CDSRxTemp1_TempNDC.Value, 1, 9);
+      end;
+      if I = 29 then
+      begin
+        PIP29 :=  ProductIdentifierClinicalType.Create;
+        PIP29.ProductIdentifier := ProductIdentifierType.Create;
+        PIP29.ProductIdentifier.IdentifierType := ProductIdentifierEnum.NDC9;
+        PIP29.ProductIdentifier.Identifier := Copy(CDSRxTemp1_TempNDC.Value, 1, 9);
+      end;
+
+      CDSRxTemp1_Temp.Next;
+    end;
+
+
+    Counter := 0;
+    Request.Prescribing := ClinicalPrescribedType.Create;
+      I := CDSRxTemp1_Temp.RecordCount -1;
+      case I of
+        0: Request.Prescribing.Product := array_of_ProductIdentifierClinicalType.Create(PIP0);
+        1: Request.Prescribing.Product := array_of_ProductIdentifierClinicalType.Create(PIP0, PIP1);
+        2: Request.Prescribing.Product := array_of_ProductIdentifierClinicalType.Create(PIP0, PIP1, PIP2);
+        3: Request.Prescribing.Product := array_of_ProductIdentifierClinicalType.Create(PIP0, PIP1, PIP2, PIP3);
+        4: Request.Prescribing.Product := array_of_ProductIdentifierClinicalType.Create(PIP0, PIP1, PIP2, PIP3, PIP4);
+        5: Request.Prescribing.Product := array_of_ProductIdentifierClinicalType.Create(PIP0, PIP1, PIP2, PIP3, PIP4, PIP5);
+        6: Request.Prescribing.Product := array_of_ProductIdentifierClinicalType.Create(PIP0, PIP1, PIP2, PIP3, PIP4, PIP5, PIP6);
+        7: Request.Prescribing.Product := array_of_ProductIdentifierClinicalType.Create(PIP0, PIP1, PIP2, PIP3, PIP4, PIP5, PIP6, PIP7);
+        8: Request.Prescribing.Product := array_of_ProductIdentifierClinicalType.Create(PIP0, PIP1, PIP2, PIP3, PIP4, PIP5, PIP6, PIP7, PIP8);
+        9: Request.Prescribing.Product := array_of_ProductIdentifierClinicalType.Create(PIP0, PIP1, PIP2, PIP3, PIP4, PIP5, PIP6, PIP7, PIP8, PIP9);
+        10: Request.Prescribing.Product := array_of_ProductIdentifierClinicalType.Create(PIP0, PIP1, PIP2, PIP3, PIP4, PIP5, PIP6, PIP7, PIP8, PIP9, PIP10);
+        11: Request.Prescribing.Product := array_of_ProductIdentifierClinicalType.Create(PIP0, PIP1, PIP2, PIP3, PIP4, PIP5, PIP6, PIP7, PIP8, PIP9, PIP10, PIP11);
+        12: Request.Prescribing.Product := array_of_ProductIdentifierClinicalType.Create(PIP0, PIP1, PIP2, PIP3, PIP4, PIP5, PIP6, PIP7, PIP8, PIP9, PIP10, PIP11, PIP12);
+        13: Request.Prescribing.Product := array_of_ProductIdentifierClinicalType.Create(PIP0, PIP1, PIP2, PIP3, PIP4, PIP5, PIP6, PIP7, PIP8, PIP9, PIP10, PIP11, PIP12, PIP13);
+        14: Request.Prescribing.Product := array_of_ProductIdentifierClinicalType.Create(PIP0, PIP1, PIP2, PIP3, PIP4, PIP5, PIP6, PIP7, PIP8, PIP9, PIP10, PIP11, PIP12, PIP13, PIP14);
+        15: Request.Prescribing.Product := array_of_ProductIdentifierClinicalType.Create(PIP0, PIP1, PIP2, PIP3, PIP4, PIP5, PIP6, PIP7, PIP8, PIP9, PIP10, PIP11, PIP12, PIP13, PIP14, PIP15);
+        16: Request.Prescribing.Product := array_of_ProductIdentifierClinicalType.Create(PIP0, PIP1, PIP2, PIP3, PIP4, PIP5, PIP6, PIP7, PIP8, PIP9, PIP10, PIP11, PIP12, PIP13, PIP14, PIP15, PIP16);
+        17: Request.Prescribing.Product := array_of_ProductIdentifierClinicalType.Create(PIP0, PIP1, PIP2, PIP3, PIP4, PIP5, PIP6, PIP7, PIP8, PIP9, PIP10, PIP11, PIP12, PIP13, PIP14, PIP15, PIP16, PIP17);
+        18: Request.Prescribing.Product := array_of_ProductIdentifierClinicalType.Create(PIP0, PIP1, PIP2, PIP3, PIP4, PIP5, PIP6, PIP7, PIP8, PIP9, PIP10, PIP11, PIP12, PIP13, PIP14, PIP15, PIP16, PIP17, PIP18);
+        19: Request.Prescribing.Product := array_of_ProductIdentifierClinicalType.Create(PIP0, PIP1, PIP2, PIP3, PIP4, PIP5, PIP6, PIP7, PIP8, PIP9, PIP10, PIP11, PIP12, PIP13, PIP14, PIP15, PIP16, PIP17, PIP18, PIP19);
+      end;
+
+
+    With Request do
+    begin
+      PatientDemographics := PatientDemographicsType.Create;
+      With PatientDemographics do
+      begin
+        for I := 0 to CDSAlergies.RecordCount - 1 do
+        begin
+          if I = 0 then
+          begin
+            API0 := AllergyAllergySubstanceClassType.Create;
+            API0.Identifier := CDSAlergiesALLERGY.Value;
+          end;
+          if I = 1 then
+          begin
+            API1 := AllergyAllergySubstanceClassType.Create;
+            API1.Identifier := CDSAlergiesALLERGY.Value;
+          end;
+          if I = 2 then
+          begin
+            API2 := AllergyAllergySubstanceClassType.Create;
+            API2.Identifier := CDSAlergiesALLERGY.Value;
+          end;
+          if I = 3 then
+          begin
+            API3 := AllergyAllergySubstanceClassType.Create;
+            API3.Identifier := CDSAlergiesALLERGY.Value;
+          end;
+          if I = 4 then
+          begin
+            API4 := AllergyAllergySubstanceClassType.Create;
+            API4.Identifier := CDSAlergiesALLERGY.Value;
+          end;
+          if I = 5 then
+          begin
+            API5 := AllergyAllergySubstanceClassType.Create;
+            API5.Identifier := CDSAlergiesALLERGY.Value;
+          end;
+          if I = 6 then
+          begin
+            API6 := AllergyAllergySubstanceClassType.Create;
+            API6.Identifier := CDSAlergiesALLERGY.Value;;
+          end;
+          if I = 7 then
+          begin
+            API7 := AllergyAllergySubstanceClassType.Create;
+            API7.Identifier := CDSAlergiesALLERGY.Value;
+          end;
+          if I = 8 then
+          begin
+            API8 := AllergyAllergySubstanceClassType.Create;
+            API8.Identifier := CDSAlergiesALLERGY.Value;
+          end;
+          if I = 9 then
+          begin
+            API9 := AllergyAllergySubstanceClassType.Create;
+            API9.Identifier := CDSAlergiesALLERGY.Value;
+          end;
+          CDSAlergies.Next;
+        end;
+    Request.PatientDemographics.Allergy := AllergyRequestType.Create;
+    //for I := 0 to CDSAlergies.RecordCount - 1 do
+    //begin
+
+    I := CDSAlergies.RecordCount;
+      case I of
+        1:  Request.PatientDemographics.Allergy.AllergySubstanceClass := array_of_int.Create(API0.Identifier);
+        2:  Request.PatientDemographics.Allergy.AllergySubstanceClass :=  array_of_int.Create(API0.Identifier,API1.Identifier);
+        3:  Request.PatientDemographics.Allergy.AllergySubstanceClass :=  array_of_int.Create(API0.Identifier,API1.Identifier,API2.Identifier);
+        4:  Request.PatientDemographics.Allergy.AllergySubstanceClass :=  array_of_int.Create(API0.Identifier,API1.Identifier,API2.Identifier,API3.Identifier);
+        5:  Request.PatientDemographics.Allergy.AllergySubstanceClass :=  array_of_int.Create(API0.Identifier,API1.Identifier,API2.Identifier,API3.Identifier,API4.Identifier);
+        6:  Request.PatientDemographics.Allergy.AllergySubstanceClass :=  array_of_int.Create(API0.Identifier,API1.Identifier,API2.Identifier,API3.Identifier,API4.Identifier,API5.Identifier);
+        7:  Request.PatientDemographics.Allergy.AllergySubstanceClass :=  array_of_int.Create(API0.Identifier,API1.Identifier,API2.Identifier,API3.Identifier,API4.Identifier,API5.Identifier,API6.Identifier);
+        8:  Request.PatientDemographics.Allergy.AllergySubstanceClass :=  array_of_int.Create(API0.Identifier,API1.Identifier,API2.Identifier,API3.Identifier,API4.Identifier,API5.Identifier,API6.Identifier,API7.Identifier);
+        9:  Request.PatientDemographics.Allergy.AllergySubstanceClass :=  array_of_int.Create(API0.Identifier,API1.Identifier,API2.Identifier,API3.Identifier,API4.Identifier,API5.Identifier,API6.Identifier,API7.Identifier,API8.Identifier);
+        10:  Request.PatientDemographics.Allergy.AllergySubstanceClass :=  array_of_int.Create(API0.Identifier,API1.Identifier,API2.Identifier,API3.Identifier,API4.Identifier,API5.Identifier,API6.Identifier,API7.Identifier,API8.Identifier,API9.Identifier);
+
+      end;
+    //end;
+
+
+        if CDSPacientesSEXO.Value = 1 then
+          Gender := GenderEnum.Male
+        else
+          Gender := GenderEnum.Female;
+
+        D := TXSDate.Create;
+        D.AsDate := CDSPacientesFECHANACIMIENTO.AsDateTime;
+        DateOfBirth := D;
+      end;
+      RequestedOperations := ClinicalRequestedOperationsType.Create;// RequestedOperations.Create;
+      With RequestedOperations do
+      begin
+        Allergy := True;
+        Lifestyle := ClinicalOperationLifestyleType.Create;
+        Lifestyle.Request := False;
+        DrugToDrug := ClinicalOperationDrugToDrugType.Create;
+        DrugToDrug.Request := True;
+        DrugToDrug.IncludeConsumerNotes := True;
+        DrugToDrug.IncludeProfessionalNotes := True;
+        Pregnancy := False;
+        //PregnancyAndLactation.
+        //DrugDiseaseScreening := DrugDiseaseScreening.Create;
+        //DrugDiseaseScreening.Request := False;
+        //DrugDiseaseScreening.DiagnosedCodes
+        DuplicateTherapy := ClinicalOperationDuplicateTherapyType.Create; // DuplicateTherapy.Create;
+        DuplicateTherapy.Request := True;
+        WarningLabels := ClinicalOperationWarningLabelType.Create; // WarningLabels.Create;
+        With WarningLabels do
+        begin
+          Request := False;
+          LanguageCode := 'en-US';
+          MaxLines := 5;
+          CharsPerLine := 24;
+        end;
+        DoseCheck := ClinicalOperationDoseCheckType.Create;// DoseScreeningOperationType.Create;
+        With DoseCheck do
+        begin
+          Request := False;
+        end;
+        AdverseReactions := ClinicalOperationAdverseReactionType.Create;// AdverseReactions.Create;
+        AdverseReactions.Request := False;
+      end;
+      IgnorePrescribed := False;
+
+      With Clinical do
+      begin
+        Serv  :=  GetGSDDServiceSoap(False,'', FrmMain.HTTPRIO2);
+        Response := Serv.Clinical(ClinicalRequest(request));
+        Counter := Length(response.Product);
+      end;
+      ShowInteractions := False;
+      if Counter > 0 then
+      begin
+        I := 0;
+
+        {FrmInfoGS  := TFrmInfoGS.create(Nil);
+        With FrmInfoGS do
+        begin
+          MemoInteraction.Clear;
+          I := 0;
+          for I := 0 to Counter - 1 do
+          begin
+             try
+              AllergyCount := Length(Response.Product[I].Allergy.AllergySubstanceClass);
+              if AllergyCount > 0 then
+              begin
+                //Memo1.Lines.Add('================= Patient Allergies =====================');
+                for I_Allergy := 0 to AllergyCount - 1 do
+                begin
+                  if Response.Product[I].Allergy.AllergySubstanceClass[I_Allergy].Name_ > ''  then
+                  begin
+                    ShowInteractions := True;
+                    MemoAllergies.Lines.Add('Patient is alleric to : ' + Response.Product[I].Allergy.AllergySubstanceClass[I_Allergy].Name_);
+                    MemoInteraction.Lines.Add('Patient is alleric to : ' + Response.Product[I].Allergy.AllergySubstanceClass[I_Allergy].Name_);
+                    if Assigned(FAnadirRecetas) then
+                    begin
+                      FAnadirRecetas.MemoAllergies.Lines.Add('Patient is alleric to : ' + Response.Product[I].Allergy.AllergySubstanceClass[I_Allergy].Name_);
+                      FAnadirRecetas.MemoInteraction.Lines.Add('Patient is alleric to : ' + Response.Product[I].Allergy.AllergySubstanceClass[I_Allergy].Name_);
+                    end;
+                  end;
+                end;
+              end;
+            Except
+               //
+            end;
+          end;
+
+          I := 0;
+
+          for I := 0 to Counter - 1 do
+          begin
+            With MemoInteraction do begin
+
+              Try
+                  Lines.Add('======================================================================');
+                  Lines.Add(Response.Product[I].ProductName);
+                  Counter_Product := Length(Response.Product[I].Drug.Product);
+                  //ShowMessage(IntToStr(Counter_drug));
+                  if Counter_Product > 0 then
+                  begin
+                    I_Product := 0;
+                    for I_Product := 0 to Counter_Product - 1 do
+                    begin
+                       I_Interaction := Length(Response.Product[I].Drug.Product[I_Product].Interaction);
+                       I_Inter := 0;
+                       for I_Inter := 0 to I_Interaction - 1 do
+                       begin
+                          SeverityDrugInteraction := Response.Product[I].Drug.Product[I_Product].Interaction[I_Inter].Severity.SeverityRanking;
+                          if Trim(Response.Product[I].Drug.Product[I_Product].Interaction[I_Inter].ProfessionalNotesAbbr) > '' then  ShowInteractions := True else ShowInteractions := False;
+                          Lines.Add(Response.Product[I].Drug.Product[I_Product].Interaction[I_Inter].Severity.SeverityText);
+                          Lines.Add(Response.Product[I].Drug.Product[I_Product].Interaction[I_Inter].ProfessionalNotesAbbr);
+                          if (SeverityDrugInteraction <= Prescription.DrugInteractionSeverity) then
+                          begin
+                            if StopInteraction = False then StopInteraction := True;
+                          end;
+                          if (Prescription.DrugInteractionSeverity < 1) then
+                          begin
+                            StopInteraction := False;
+                          end;
+                       end;
+                     end;
+                  end;
+              Except
+                //
+              End;
+            end;
+          end;
+
+          if Assigned(FAnadirRecetas) then
+          begin
+            MemoInteraction.Clear;
+            With FAnadirRecetas do
+            begin
+              for I := 0 to Counter - 1 do
+              begin
+                With MemoInteraction do begin
+
+                  Try
+                      Lines.Add('================================');
+                      Lines.Add(Response.Product[I].ProductName);
+                      Counter_Product := Length(Response.Product[I].Drug.Product);
+                      //ShowMessage(IntToStr(Counter_drug));
+                      if Counter_Product > 0 then
+                      begin
+                        I_Product := 0;
+                        for I_Product := 0 to Counter_Product - 1 do
+                        begin
+                           I_Interaction := Length(Response.Product[I].Drug.Product[I_Product].Interaction);
+
+
+                           I_Inter := 0;
+                           for I_Inter := 0 to I_Interaction - 1 do
+                           begin
+                              SeverityDrugInteraction := Response.Product[I].Drug.Product[I_Product].Interaction[I_Inter].Severity.SeverityRanking;
+                              if Trim(Response.Product[I].Drug.Product[I_Product].Interaction[I_Inter].ProfessionalNotesAbbr) > '' then  ShowInteractions := True else ShowInteractions := False;
+                              Lines.Add(Response.Product[I].Drug.Product[I_Product].Interaction[I_Inter].Severity.SeverityText);
+                              Lines.Add(Response.Product[I].Drug.Product[I_Product].Interaction[I_Inter].ProfessionalNotesAbbr);
+                              if (SeverityDrugInteraction <= Prescription.DrugInteractionSeverity) then
+                              begin
+                                if StopInteraction = False then StopInteraction := True;
+                              end;
+                              if (Prescription.DrugInteractionSeverity < 1) then
+                              begin
+                                StopInteraction := False;
+                              end;
+                           end;
+                         end;
+                      end;
+                  Except
+                    //
+                  End;
+                end;
+              end;
+            end;
+          end;
+
+
+          if ShowInteractions = True then
+          begin
+            if StopInteraction = True then
+            begin
+              if StopInteraction = True then Result := False;
+              FrmInfoGS.ButtonOK.Enabled := False;
+              FrmInfoGS.BPharmacistPassword.Enabled := True;
+            end;
+            PopupMode := pmExplicit;
+            if Forma = 'FAnadirRecetas' then PopupParent := FAnadirRecetas;
+            if Forma = 'FHistorial' then
+            begin
+              PopupParent := FHistorial;
+              ShowModal;
+            end;
+            if Forma = 'FrmWorkflow' then
+            begin
+              //PopupParent := FrmWorkflow;
+              ShowModal;
+            end;
+          end;
+
+          if not(Assigned(FAnadirRecetas)) then
+          begin
+            if ModalResult = mrCancel then
+              Result := False
+            else
+              Result := True;
+          end;
+        end;
+        FrmInfoGS := Nil;
+        FrmInfoGS.Free;
+        }
+        Response.Destroy;
+        Request.Destroy;
+      end;
+    end;
+  end;
+end;
+
+
+
+
+end.
+
