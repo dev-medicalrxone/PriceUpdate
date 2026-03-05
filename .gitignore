@@ -26,3 +26,9 @@ Release/
 # Delphi resources
 *.rsm
 
+# Delphi backup / versioned files created by IDE/editor
+*.~*~
+*.bak
+*.tmp
+*.orig
+*.~dsk
