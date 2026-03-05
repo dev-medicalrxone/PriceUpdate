@@ -22,3 +22,7 @@ Win32/
 Win64/
 Debug/
 Release/
+
+# Delphi resources
+*.rsm
+
