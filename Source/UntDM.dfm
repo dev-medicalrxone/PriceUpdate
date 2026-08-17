@@ -9815,532 +9815,419 @@ object DM: TDM
     Top = 88
     object CDSInventarioTIPO: TStringField
       FieldName = 'TIPO'
-      Origin = 'TIPO'
       FixedChar = True
       Size = 3
     end
     object CDSInventarioFECHA_EXPIRACION: TSQLTimeStampField
       FieldName = 'FECHA_EXPIRACION'
-      Origin = 'FECHA_EXPIRACION'
-      EditMask = '!99/99/0000;1;_'
     end
     object CDSInventarioCODIGO: TStringField
       FieldName = 'CODIGO'
-      Origin = 'CODIGO'
       FixedChar = True
       Size = 1
+    end
+    object CDSInventarioCOSTO: TFMTBCDField
+      FieldName = 'COSTO'
+      Precision = 18
+      Size = 2
+    end
+    object CDSInventarioRBP: TFMTBCDField
+      FieldName = 'RBP'
+      Precision = 18
+      Size = 2
+    end
+    object CDSInventarioESPECIAL: TFMTBCDField
+      FieldName = 'ESPECIAL'
+      Precision = 18
+      Size = 2
     end
     object CDSInventarioDEPARTAMENTO: TSmallintField
       FieldName = 'DEPARTAMENTO'
-      Origin = 'DEPARTAMENTO'
     end
     object CDSInventarioLOTE: TStringField
       FieldName = 'LOTE'
-      Origin = 'LOTE'
       FixedChar = True
       Size = 12
     end
+    object CDSInventarioPRECIO: TFMTBCDField
+      FieldName = 'PRECIO'
+      Precision = 18
+      Size = 2
+    end
     object CDSInventarioCOMESPECIAL: TSQLTimeStampField
       FieldName = 'COMESPECIAL'
-      Origin = 'COMESPECIAL'
     end
     object CDSInventarioTERMINAESPECIAL: TSQLTimeStampField
       FieldName = 'TERMINAESPECIAL'
-      Origin = 'TERMINAESPECIAL'
-    end
-    object CDSInventarioPORCIENTODESCUENTO: TStringField
-      FieldName = 'PORCIENTODESCUENTO'
-      Origin = 'PORCIENTODESCUENTO'
-      FixedChar = True
-      Size = 1
     end
     object CDSInventarioULTIMOCAMBIO: TStringField
       FieldName = 'ULTIMOCAMBIO'
-      Origin = 'ULTIMOCAMBIO'
       FixedChar = True
       Size = 30
     end
     object CDSInventarioULTIMAVENTA: TSQLTimeStampField
       FieldName = 'ULTIMAVENTA'
-      Origin = 'ULTIMAVENTA'
+    end
+    object CDSInventarioCMAXINVENTARIO: TFMTBCDField
+      FieldName = 'CMAXINVENTARIO'
+      Precision = 18
+      Size = 2
+    end
+    object CDSInventarioCMININVENTARIO: TFMTBCDField
+      FieldName = 'CMININVENTARIO'
+      Precision = 18
+      Size = 2
     end
     object CDSInventarioCODIGOBARRA: TStringField
       FieldName = 'CODIGOBARRA'
-      Origin = 'CODIGOBARRA'
       Required = True
       FixedChar = True
       Size = 14
     end
     object CDSInventarioFOODITEM: TSmallintField
       FieldName = 'FOODITEM'
-      Origin = 'FOODITEM'
       Required = True
     end
     object CDSInventarioNONEBC: TSmallintField
       FieldName = 'NONEBC'
-      Origin = 'NONEBC'
       Required = True
     end
     object CDSInventarioNUMEROSUPLIDOR: TIntegerField
       FieldName = 'NUMEROSUPLIDOR'
-      Origin = 'NUMEROSUPLIDOR'
     end
-    object CDSInventarioPRODUCTNO: TIntegerField
+    object CDSInventarioPRODUCTNO: TAutoIncField
       FieldName = 'PRODUCTNO'
-      Origin = 'PRODUCTNO'
-      ProviderFlags = [pfInWhere]
+      ReadOnly = True
     end
     object CDSInventarioSUB_DEPARTAMENTO: TSmallintField
       FieldName = 'SUB_DEPARTAMENTO'
-      Origin = 'SUB_DEPARTAMENTO'
     end
     object CDSInventarioDESCRIPCION: TStringField
       FieldName = 'DESCRIPCION'
-      Origin = 'DESCRIPCION'
       FixedChar = True
       Size = 35
     end
     object CDSInventarioROUTEOFADMINISTRATION: TStringField
       FieldName = 'ROUTEOFADMINISTRATION'
-      Origin = 'ROUTEOFADMINISTRATION'
       FixedChar = True
       Size = 16
     end
     object CDSInventarioCONTROLADO: TStringField
       FieldName = 'CONTROLADO'
-      Origin = 'CONTROLADO'
       FixedChar = True
       Size = 4
     end
     object CDSInventarioSTRENGTH: TStringField
       FieldName = 'STRENGTH'
-      Origin = 'STRENGTH'
       FixedChar = True
       Size = 25
     end
     object CDSInventarioINFOADICIONAL: TStringField
       FieldName = 'INFOADICIONAL'
-      Origin = 'INFOADICIONAL'
       FixedChar = True
       Size = 25
     end
+    object CDSInventarioMETRICSIZE: TFMTBCDField
+      FieldName = 'METRICSIZE'
+      Precision = 18
+      Size = 2
+    end
     object CDSInventarioCAUTION1: TSmallintField
       FieldName = 'CAUTION1'
-      Origin = 'CAUTION1'
     end
     object CDSInventarioCAUTION2: TSmallintField
       FieldName = 'CAUTION2'
-      Origin = 'CAUTION2'
     end
     object CDSInventarioCAUTION3: TSmallintField
       FieldName = 'CAUTION3'
-      Origin = 'CAUTION3'
     end
     object CDSInventarioGENERICNAME: TStringField
       FieldName = 'GENERICNAME'
-      Origin = 'GENERICNAME'
       FixedChar = True
       Size = 60
     end
-    object CDSInventarioTXR: TStringField
-      FieldName = 'TXR'
-      Origin = 'TXR'
-      FixedChar = True
-      Size = 8
-    end
     object CDSInventarioBRAND: TStringField
       FieldName = 'BRAND'
-      Origin = 'BRAND'
       FixedChar = True
       Size = 1
     end
     object CDSInventarioGROUP_PRODUCTNO: TIntegerField
       FieldName = 'GROUP_PRODUCTNO'
-      Origin = 'GROUP_PRODUCTNO'
     end
     object CDSInventarioRECETARIO: TStringField
       FieldName = 'RECETARIO'
-      Origin = 'RECETARIO'
       FixedChar = True
       Size = 1
     end
+    object CDSInventarioQTY_CAJA: TFMTBCDField
+      FieldName = 'QTY_CAJA'
+      Precision = 18
+      Size = 2
+    end
     object CDSInventarioDESCUENTO: TStringField
       FieldName = 'DESCUENTO'
-      Origin = 'DESCUENTO'
       FixedChar = True
       Size = 1
     end
     object CDSInventarioIMAGE_CODE: TStringField
       FieldName = 'IMAGE_CODE'
-      Origin = 'IMAGE_CODE'
       FixedChar = True
       Size = 9
     end
     object CDSInventarioPACKAGESIZE: TIntegerField
       FieldName = 'PACKAGESIZE'
-      Origin = 'PACKAGESIZE'
-      DisplayFormat = '#.00'
-    end
-    object CDSInventarioTXR_EXTENSION: TStringField
-      FieldName = 'TXR_EXTENSION'
-      Origin = 'TXR_EXTENSION'
-      FixedChar = True
-      Size = 14
     end
     object CDSInventarioSTATUS: TStringField
       FieldName = 'STATUS'
-      Origin = 'STATUS'
       FixedChar = True
       Size = 1
     end
     object CDSInventarioTAXABLE: TStringField
       FieldName = 'TAXABLE'
-      Origin = 'TAXABLE'
-      FixedChar = True
-      Size = 1
-    end
-    object CDSInventarioTAXABLE_ESTATAL: TStringField
-      FieldName = 'TAXABLE_ESTATAL'
-      Origin = 'TAXABLE_ESTATAL'
       FixedChar = True
       Size = 1
     end
     object CDSInventarioPO: TStringField
       FieldName = 'PO'
-      Origin = 'PO'
       Size = 10
     end
     object CDSInventarioISBN: TStringField
       FieldName = 'ISBN'
-      Origin = 'ISBN'
     end
     object CDSInventarioNDC: TWideStringField
       FieldName = 'NDC'
-      Origin = 'NDC'
       FixedChar = True
       Size = 19
     end
-    object CDSInventarioMedicamentoStr: TStringField
-      FieldKind = fkCalculated
-      FieldName = 'MedicamentoStr'
-      Size = 50
-      Calculated = True
-    end
-    object CDSInventarioC1: TStringField
-      FieldKind = fkLookup
-      FieldName = 'C1'
-      LookupDataSet = CDSCautions
-      LookupKeyFields = 'NOCOL'
-      LookupResultField = 'DESCRIPTION'
-      KeyFields = 'CAUTION1'
-      Size = 40
-      Lookup = True
-    end
-    object CDSInventarioC2: TStringField
-      FieldKind = fkLookup
-      FieldName = 'C2'
-      LookupDataSet = CDSCautions
-      LookupKeyFields = 'NOCOL'
-      LookupResultField = 'DESCRIPTION'
-      KeyFields = 'CAUTION2'
-      Size = 40
-      Lookup = True
-    end
-    object CDSInventarioC3: TStringField
-      FieldKind = fkLookup
-      FieldName = 'C3'
-      LookupDataSet = CDSCautions
-      LookupKeyFields = 'NOCOL'
-      LookupResultField = 'DESCRIPTION'
-      KeyFields = 'CAUTION3'
-      Size = 40
-      Lookup = True
-    end
-    object CDSInventarioC1ENG: TStringField
-      FieldKind = fkLookup
-      FieldName = 'C1ENG'
-      LookupDataSet = CDSCautions
-      LookupKeyFields = 'NOCOL'
-      LookupResultField = 'DESCRIPTION_ENGLISH'
-      KeyFields = 'CAUTION1'
-      Size = 40
-      Lookup = True
-    end
-    object CDSInventarioC2ENG: TStringField
-      FieldKind = fkLookup
-      FieldName = 'C2ENG'
-      LookupDataSet = CDSCautions
-      LookupKeyFields = 'NOCOL'
-      LookupResultField = 'DESCRIPTION_ENGLISH'
-      KeyFields = 'CAUTION2'
-      Size = 40
-      Lookup = True
-    end
-    object CDSInventarioC3ENG: TStringField
-      FieldKind = fkLookup
-      FieldName = 'C3ENG'
-      LookupDataSet = CDSCautions
-      LookupKeyFields = 'NOCOL'
-      LookupResultField = 'DESCRIPTION_ENGLISH'
-      KeyFields = 'CAUTION3'
-      Size = 40
-      Lookup = True
-    end
-    object CDSInventarioMOVIMIENTO: TStringField
-      FieldKind = fkCalculated
-      FieldName = 'MOVIMIENTO'
-      Size = 1
-      Calculated = True
-    end
-    object CDSInventarioSUBDPT: TStringField
-      FieldKind = fkLookup
-      FieldName = 'SUBDPT'
-      LookupDataSet = CDSSubDept
-      LookupKeyFields = 'DEPARTAMENTO'
-      LookupResultField = 'DESCRIPCION'
-      KeyFields = 'SUB_DEPARTAMENTO'
-      Size = 40
-      Lookup = True
-    end
-    object CDSInventarioDepartamentoName: TStringField
-      FieldKind = fkLookup
-      FieldName = 'DepartamentoName'
-      LookupDataSet = CDSDepartamentos
-      LookupKeyFields = 'DEPARTAMENTO'
-      LookupResultField = 'DESCRIPCION'
-      KeyFields = 'DEPARTAMENTO'
-      Size = 40
-      Lookup = True
-    end
-    object CDSInventarioSuplidorName: TStringField
-      FieldKind = fkLookup
-      FieldName = 'SuplidorName'
-      LookupDataSet = CDSSuplidores
-      LookupKeyFields = 'NUMEROSUPLIDOR'
-      LookupResultField = 'SUPLIDOR'
-      KeyFields = 'NUMEROSUPLIDOR'
-      Size = 45
-      Lookup = True
-    end
     object CDSInventarioMETRIC_UNIT: TWideStringField
       FieldName = 'METRIC_UNIT'
-      Origin = 'METRIC_UNIT'
       FixedChar = True
       Size = 3
     end
     object CDSInventarioROBOT: TIntegerField
       FieldName = 'ROBOT'
-      Origin = 'ROBOT'
     end
     object CDSInventarioROBOT_NDC: TWideStringField
       FieldName = 'ROBOT_NDC'
-      Origin = 'ROBOT_NDC'
       FixedChar = True
       Size = 11
     end
-    object CDSInventarioPATROCINIO: TIntegerField
-      FieldName = 'PATROCINIO'
-      Origin = 'PATROCINIO'
+    object CDSInventarioCOBRAR_TAX: TIntegerField
+      FieldName = 'COBRAR_TAX'
     end
     object CDSInventarioALCHEMY_PRODUCTID: TIntegerField
       FieldName = 'ALCHEMY_PRODUCTID'
-      Origin = 'ALCHEMY_PRODUCTID'
     end
     object CDSInventarioMARKET_STATUS: TWideStringField
       FieldName = 'MARKET_STATUS'
-      Origin = 'MARKET_STATUS'
       FixedChar = True
       Size = 10
     end
     object CDSInventarioOUTERPACKAGEUNIT: TWideStringField
       FieldName = 'OUTERPACKAGEUNIT'
-      Origin = 'OUTERPACKAGEUNIT'
       FixedChar = True
       Size = 10
     end
     object CDSInventarioPAKAGE_ID: TIntegerField
       FieldName = 'PAKAGE_ID'
-      Origin = 'PAKAGE_ID'
-    end
-    object CDSInventarioCOBRAR_TAX: TIntegerField
-      FieldName = 'COBRAR_TAX'
-      Origin = 'COBRAR_TAX'
-    end
-    object CDSInventarioCASA_FARMACEUTICA: TStringField
-      FieldName = 'CASA_FARMACEUTICA'
-      Origin = 'CASA_FARMACEUTICA'
-      FixedChar = True
-      Size = 35
-    end
-    object CDSInventarioPAKAGE_DESCRIPTION: TWideStringField
-      FieldName = 'PAKAGE_DESCRIPTION'
-      Origin = 'PAKAGE_DESCRIPTION'
-      FixedChar = True
-      Size = 140
-    end
-    object CDSInventarioVERSION_DESCRIPTION: TWideStringField
-      FieldName = 'VERSION_DESCRIPTION'
-      Origin = 'VERSION_DESCRIPTION'
-      FixedChar = True
-      Size = 150
-    end
-    object CDSInventarioStatus_Define: TStringField
-      FieldKind = fkCalculated
-      FieldName = 'Status_Define'
-      Size = 10
-      Calculated = True
     end
     object CDSInventarioREVENUE_CODE: TWideStringField
       FieldName = 'REVENUE_CODE'
-      Origin = 'REVENUE_CODE'
       FixedChar = True
       Size = 4
     end
     object CDSInventarioHCPCS: TWideStringField
       FieldName = 'HCPCS'
-      Origin = 'HCPCS'
       FixedChar = True
       Size = 5
+    end
+    object CDSInventarioCASA_FARMACEUTICA: TStringField
+      FieldName = 'CASA_FARMACEUTICA'
+      FixedChar = True
+      Size = 150
+    end
+    object CDSInventarioVERSION_DESCRIPTION: TWideStringField
+      FieldName = 'VERSION_DESCRIPTION'
+      FixedChar = True
+      Size = 150
+    end
+    object CDSInventarioPAKAGE_DESCRIPTION: TWideStringField
+      FieldName = 'PAKAGE_DESCRIPTION'
+      FixedChar = True
+      Size = 150
     end
     object CDSInventarioAllowControledRefills: TBooleanField
       FieldName = 'AllowControledRefills'
-      Origin = 'AllowControledRefills'
     end
     object CDSInventarioPRICE_TABLE_ID: TIntegerField
       FieldName = 'PRICE_TABLE_ID'
-      Origin = 'PRICE_TABLE_ID'
-    end
-    object CDSInventarioPRICE_TABLE_ID_DEF: TStringField
-      FieldKind = fkLookup
-      FieldName = 'PRICE_TABLE_ID_DEF'
-      LookupDataSet = cdsPriceTable
-      LookupKeyFields = 'PRICE_TABLE_ID'
-      LookupResultField = 'CODE_RANGE'
-      KeyFields = 'PRICE_TABLE_ID'
-      Size = 5
-      Lookup = True
     end
     object CDSInventarioOVERRIDE_SYSTEM_DEFAULT_PRICE: TBooleanField
       FieldName = 'OVERRIDE_SYSTEM_DEFAULT_PRICE'
-      Origin = 'OVERRIDE_SYSTEM_DEFAULT_PRICE'
     end
-    object CDSInventarioENTER_LAB_RESULTS: TBooleanField
-      FieldName = 'ENTER_LAB_RESULTS'
-      Origin = 'ENTER_LAB_RESULTS'
-    end
-    object CDSInventarioEXPIRE_OTHER: TWideStringField
-      FieldName = 'EXPIRE_OTHER'
-      Origin = 'EXPIRE_OTHER'
-      FixedChar = True
-      Size = 15
-    end
-    object CDSInventarioEXPIRE_DAYS: TIntegerField
-      FieldName = 'EXPIRE_DAYS'
-      Origin = 'EXPIRE_DAYS'
-    end
-    object CDSInventarioEXPIRE_OPTION: TWideStringField
-      FieldName = 'EXPIRE_OPTION'
-      Origin = 'EXPIRE_OPTION'
-      FixedChar = True
-      Size = 15
-    end
-    object CDSInventarioMARKETEDPRODUCTID: TIntegerField
-      FieldName = 'MARKETEDPRODUCTID'
-      Origin = 'MARKETEDPRODUCTID'
-    end
-    object CDSInventarioPRICE_UPDATE: TBooleanField
-      FieldName = 'PRICE_UPDATE'
-      Origin = 'PRICE_UPDATE'
-    end
-    object CDSInventarioCOSTO: TFMTBCDField
-      FieldName = 'COSTO'
-      Origin = 'COSTO'
-      Precision = 18
-      Size = 2
-    end
-    object CDSInventarioRBP: TFMTBCDField
-      FieldName = 'RBP'
-      Origin = 'RBP'
-      DisplayFormat = '#.00'
-      Precision = 18
-      Size = 2
-    end
-    object CDSInventarioESPECIAL: TFMTBCDField
-      FieldName = 'ESPECIAL'
-      Origin = 'ESPECIAL'
-      DisplayFormat = '#.00'
-      Precision = 18
-      Size = 2
-    end
-    object CDSInventarioPRECIO: TFMTBCDField
-      FieldName = 'PRECIO'
-      Origin = 'PRECIO'
-      DisplayFormat = '#.00'
-      Precision = 18
-      Size = 2
-    end
-    object CDSInventarioCMAXINVENTARIO: TFMTBCDField
-      FieldName = 'CMAXINVENTARIO'
-      Origin = 'CMAXINVENTARIO'
-      DisplayFormat = '#.00'
-      Precision = 18
-      Size = 2
-    end
-    object CDSInventarioCMININVENTARIO: TFMTBCDField
-      FieldName = 'CMININVENTARIO'
-      Origin = 'CMININVENTARIO'
-      DisplayFormat = '#.00'
-      Precision = 18
-      Size = 2
-    end
-    object CDSInventarioMETRICSIZE: TFMTBCDField
-      FieldName = 'METRICSIZE'
-      Origin = 'METRICSIZE'
-      DisplayFormat = '#.00'
-      Precision = 18
-      Size = 2
-    end
-    object CDSInventarioAAC_PRICE: TFMTBCDField
-      FieldName = 'AAC_PRICE'
-      Origin = 'AAC_PRICE'
-      DisplayFormat = '#.00'
+    object CDSInventarioWAC_PRICE: TFMTBCDField
+      FieldName = 'WAC_PRICE'
       Precision = 18
       Size = 2
     end
     object CDSInventarioMAC_PRICE: TFMTBCDField
       FieldName = 'MAC_PRICE'
-      Origin = 'MAC_PRICE'
-      DisplayFormat = '#.00'
       Precision = 18
       Size = 2
     end
     object CDSInventarioDIRECT_PRICE: TFMTBCDField
       FieldName = 'DIRECT_PRICE'
-      Origin = 'DIRECT_PRICE'
-      DisplayFormat = '#.00'
       Precision = 18
       Size = 2
     end
     object CDSInventarioUC_PRICE: TFMTBCDField
       FieldName = 'UC_PRICE'
-      Origin = 'UC_PRICE'
-      DisplayFormat = '#.00'
       Precision = 18
       Size = 2
     end
-    object CDSInventarioWAC_PRICE: TFMTBCDField
-      FieldName = 'WAC_PRICE'
-      Origin = 'WAC_PRICE'
-      DisplayFormat = '#.00'
+    object CDSInventarioPRICE_UPDATE: TBooleanField
+      FieldName = 'PRICE_UPDATE'
+    end
+    object CDSInventarioENTER_LAB_RESULTS: TBooleanField
+      FieldName = 'ENTER_LAB_RESULTS'
+    end
+    object CDSInventarioEXPIRE_OPTION: TWideStringField
+      FieldName = 'EXPIRE_OPTION'
+      FixedChar = True
+      Size = 15
+    end
+    object CDSInventarioEXPIRE_DAYS: TIntegerField
+      FieldName = 'EXPIRE_DAYS'
+    end
+    object CDSInventarioEXPIRE_OTHER: TWideStringField
+      FieldName = 'EXPIRE_OTHER'
+      FixedChar = True
+      Size = 15
+    end
+    object CDSInventarioMARKETEDPRODUCTID: TIntegerField
+      FieldName = 'MARKETEDPRODUCTID'
+    end
+    object CDSInventarioMAIN_NDC: TBooleanField
+      FieldName = 'MAIN_NDC'
+    end
+    object CDSInventarioINITIAL_QTY: TFMTBCDField
+      FieldName = 'INITIAL_QTY'
       Precision = 18
       Size = 2
+    end
+    object CDSInventarioPSEUDOEPHEDRINE: TBooleanField
+      FieldName = 'PSEUDOEPHEDRINE'
+    end
+    object CDSInventarioEDITAR_PRECIO: TBooleanField
+      FieldName = 'EDITAR_PRECIO'
     end
     object CDSInventarioQTYINVENTARIO: TFMTBCDField
       FieldName = 'QTYINVENTARIO'
-      Origin = 'QTYINVENTARIO'
-      DisplayFormat = '#.00'
       Precision = 18
       Size = 2
+    end
+    object CDSInventarioNOTE: TMemoField
+      FieldName = 'NOTE'
+      BlobType = ftMemo
+    end
+    object CDSInventarioDAILY_SALE_START_TIME: TTimeField
+      FieldName = 'DAILY_SALE_START_TIME'
+    end
+    object CDSInventarioDAILY_SALE_END_TIME: TTimeField
+      FieldName = 'DAILY_SALE_END_TIME'
+    end
+    object CDSInventarioQuantityUnitOfMeasure: TWideStringField
+      FieldName = 'QuantityUnitOfMeasure'
+      FixedChar = True
+      Size = 50
+    end
+    object CDSInventarioStrengthForm: TWideStringField
+      FieldName = 'StrengthForm'
+      FixedChar = True
+      Size = 50
+    end
+    object CDSInventarioStrengthUnitOfMeasure: TWideStringField
+      FieldName = 'StrengthUnitOfMeasure'
+      FixedChar = True
+      Size = 50
+    end
+    object CDSInventarioAAC_PRICE: TFMTBCDField
+      FieldName = 'AAC_PRICE'
+      Precision = 18
+      Size = 2
+    end
+    object CDSInventarioUnit_of_Measure: TStringField
+      FieldName = 'Unit_of_Measure'
+      FixedChar = True
+      Size = 2
+    end
+    object CDSInventarioDOSE_FORM: TWideStringField
+      FieldName = 'DOSE_FORM'
+      FixedChar = True
+      Size = 50
+    end
+    object CDSInventarioLTC: TBooleanField
+      FieldName = 'LTC'
+    end
+    object CDSInventarioAP_FRM_SIG: TStringField
+      FieldName = 'AP_FRM_SIG'
+    end
+    object CDSInventarioAP_MTH_SIG: TStringField
+      FieldName = 'AP_MTH_SIG'
+    end
+    object CDSInventarioGENERIC_LNK: TIntegerField
+      FieldName = 'GENERIC_LNK'
+    end
+    object CDSInventarioSPI: TStringField
+      FieldName = 'SPI'
+      Size = 10
+    end
+    object CDSInventarioINV340B_QT: TFMTBCDField
+      FieldName = 'INV340B_QT'
+      Precision = 18
+      Size = 2
+    end
+    object CDSInventarioINVLTC_QT: TFMTBCDField
+      FieldName = 'INVLTC_QT'
+      Precision = 18
+      Size = 2
+    end
+    object CDSInventarioDrug340B: TBooleanField
+      FieldName = 'Drug340B'
+    end
+    object CDSInventarioFactorSig: TFMTBCDField
+      FieldName = 'FactorSig'
+      Precision = 18
+      Size = 2
+    end
+    object CDSInventarioDF_QTY: TFMTBCDField
+      FieldName = 'DF_QTY'
+      Precision = 18
+      Size = 2
+    end
+    object CDSInventarioDF_SIG: TStringField
+      FieldName = 'DF_SIG'
+      FixedChar = True
+      Size = 4
+    end
+    object CDSInventarioHCPCS_CODE: TWideStringField
+      FieldName = 'HCPCS_CODE'
+      FixedChar = True
+      Size = 11
+    end
+    object CDSInventarioPRODUCTSERVIDQUAL: TStringField
+      FieldName = 'PRODUCTSERVIDQUAL'
+      FixedChar = True
+      Size = 2
+    end
+    object CDSInventarioMODIFIER_QTY: TIntegerField
+      FieldName = 'MODIFIER_QTY'
+    end
+    object CDSInventarioKITCHEN: TBooleanField
+      FieldName = 'KITCHEN'
+    end
+    object CDSInventarioHAS_MODIFIER: TBooleanField
+      FieldName = 'HAS_MODIFIER'
     end
   end
   object DSInventario: TDataSource
